@@ -1,14 +1,19 @@
---// 
+--[[
+    GrayStar Shader Engine — Yukishimaru
+    Версия: 4.0 (рефакторинг + плавное перетаскивание + отдельные вкладки)
+]]
+
+--// Services
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 
---// 
+--// Library (Late's Library)
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/lxte/lates-lib/main/Main.lua"))()
 local Window = Library:CreateWindow({
-    Title = "Yukishimaru Shader Engine",
+    Title = "GrayStar Engine | Yukishimaru",
     Theme = "Dark",
     Size = UDim2.fromOffset(720, 560),
     Transparency = 0.12,
@@ -16,7 +21,7 @@ local Window = Library:CreateWindow({
     MinimizeKeybind = Enum.KeyCode.LeftAlt,
 })
 
---// 
+--// Themes
 local Themes = {
     Light = {
         Primary = Color3.fromRGB(232, 232, 232),
@@ -58,13 +63,16 @@ local Themes = {
 
 Window:SetTheme(Themes.Dark)
 
---// 
+--// Sections (категории вкладок)
 Window:AddTabSection({ Name = "Main", Order = 1 })
-Window:AddTabSection({ Name = "Shaders", Order = 2 })
-Window:AddTabSection({ Name = "Profiles", Order = 3 })
-Window:AddTabSection({ Name = "Settings", Order = 4 })
+Window:AddTabSection({ Name = "Presets", Order = 2 })
+Window:AddTabSection({ Name = "Color Correction", Order = 3 })
+Window:AddTabSection({ Name = "Bloom", Order = 4 })
+Window:AddTabSection({ Name = "Sun Rays", Order = 5 })
+Window:AddTabSection({ Name = "Profiles", Order = 6 })
+Window:AddTabSection({ Name = "Settings", Order = 7 })
 
---// 
+--// ====================== ХРАНИЛИЩЕ ЭФФЕКТОВ ======================
 local Shaders = {
     Bloom = nil,
     Blur = nil,
@@ -72,7 +80,7 @@ local Shaders = {
     DepthOfField = nil,
     SunRays = nil,
     Atmosphere = nil,
-    -- Кастомные (сделаны через комбинации)
+    -- кастомные (заглушки)
     Vignette = nil,
     Chromatic = nil,
     Grain = nil,
@@ -117,22 +125,18 @@ local function CreateEffect(name, params)
         effect.Color = params and params.Color or Color3.fromRGB(135, 206, 235)
         effect.Decay = Color3.new(1,1,1)
     elseif name == "Vignette" then
-        -- Делаем через Bloom (не совсем виньетка, но имитация)
         effect = Instance.new("BloomEffect")
         effect.Intensity = params and params.Intensity or 0.5
         effect.Size = 1
         effect.Threshold = 0.9
     elseif name == "Chromatic" then
-        -- Имитация через ColorCorrection (сдвиг цветов)
         effect = Instance.new("ColorCorrectionEffect")
         effect.TintColor = params and params.TintColor or Color3.fromRGB(255, 100, 100)
         effect.Saturation = 0.5
     elseif name == "Grain" then
-        -- Имитация через добавление шума (но это не реализуемо в Lighting, оставим заглушку)
         effect = Instance.new("BlurEffect")
         effect.Size = 0.5
     elseif name == "Sharpen" then
-        -- Имитация через контраст
         effect = Instance.new("ColorCorrectionEffect")
         effect.Contrast = params and params.Contrast or 0.5
     elseif name == "EdgeDetect" then
@@ -165,7 +169,7 @@ local function ResetAllShaders()
     Window:Notify({ Title = "Yukishimaru", Description = "Все шейдеры сброшены", Duration = 2 })
 end
 
---// 
+--// ====================== ПРЕСЕТЫ ======================
 local Presets = {
     ["Default"] = function()
         ResetAllShaders()
@@ -213,45 +217,146 @@ local Presets = {
     end,
 }
 
---// 
-local ShadersTab = Window:AddTab({
-    Title = "Shaders",
-    Section = "Shaders",
+--// ====================== ВКЛАДКА MAIN ======================
+local MainTab = Window:AddTab({
+    Title = "Main",
+    Section = "Main",
+    Icon = "rbxassetid://11963373994"
+})
+
+Window:AddSection({ Name = "General", Tab = MainTab })
+Window:AddButton({
+    Title = "Notification Test",
+    Description = "Показать уведомление",
+    Tab = MainTab,
+    Callback = function()
+        Window:Notify({ Title = "Yukishimaru", Description = "Привет! Это GrayStar Engine.", Duration = 3 })
+    end,
+})
+
+--// ====================== ВКЛАДКА PRESETS ======================
+local PresetsTab = Window:AddTab({
+    Title = "Presets",
+    Section = "Presets",
+    Icon = "rbxassetid://11963373994"
+})
+
+Window:AddSection({ Name = "Apply Preset", Tab = PresetsTab })
+for presetName, presetFunc in pairs(Presets) do
+    Window:AddButton({
+        Title = presetName,
+        Tab = PresetsTab,
+        Callback = presetFunc,
+    })
+end
+Window:AddButton({
+    Title = "Reset All",
+    Tab = PresetsTab,
+    Callback = ResetAllShaders,
+})
+
+--// ====================== ВКЛАДКА COLOR CORRECTION ======================
+local ColorCorrectionTab = Window:AddTab({
+    Title = "Color Correction",
+    Section = "Color Correction",
     Icon = "rbxassetid://11293977610"
 })
 
-Window:AddSection({ Name = "Post-Processing", Tab = ShadersTab })
+Window:AddSection({ Name = "Color Correction Settings", Tab = ColorCorrectionTab })
 
--- 
 Window:AddToggle({
+    Title = "Enable Color Correction",
+    Tab = ColorCorrectionTab,
+    Default = false,
+    Callback = function(bool)
+        if bool then CreateEffect("ColorCorrection") else RemoveEffect("ColorCorrection") end
+    end,
+})
+
+Window:AddSlider({
+    Title = "Brightness",
+    Tab = ColorCorrectionTab,
+    MaxValue = 1,
+    MinValue = -1,
+    AllowDecimals = true,
+    Callback = function(amount)
+        if Shaders.ColorCorrection then Shaders.ColorCorrection.Brightness = amount end
+    end,
+})
+
+Window:AddSlider({
+    Title = "Contrast",
+    Tab = ColorCorrectionTab,
+    MaxValue = 1,
+    MinValue = -1,
+    AllowDecimals = true,
+    Callback = function(amount)
+        if Shaders.ColorCorrection then Shaders.ColorCorrection.Contrast = amount end
+    end,
+})
+
+Window:AddSlider({
+    Title = "Saturation",
+    Tab = ColorCorrectionTab,
+    MaxValue = 1,
+    MinValue = -1,
+    AllowDecimals = true,
+    Callback = function(amount)
+        if Shaders.ColorCorrection then Shaders.ColorCorrection.Saturation = amount end
+    end,
+})
+
+Window:AddButton({
+    Title = "Random Tint Color",
+    Tab = ColorCorrectionTab,
+    Callback = function()
+        if Shaders.ColorCorrection then
+            Shaders.ColorCorrection.TintColor = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255))
+            Window:Notify({ Title = "Yukishimaru", Description = "Tint color changed", Duration = 2 })
+        end
+    end,
+})
+
+--// ====================== ВКЛАДКА BLOOM ======================
+local BloomTab = Window:AddTab({
     Title = "Bloom",
-    Description = "Свечение",
-    Tab = ShadersTab,
+    Section = "Bloom",
+    Icon = "rbxassetid://11293977610"
+})
+
+Window:AddSection({ Name = "Bloom Settings", Tab = BloomTab })
+
+Window:AddToggle({
+    Title = "Enable Bloom",
+    Tab = BloomTab,
     Default = false,
     Callback = function(bool)
         if bool then CreateEffect("Bloom", {Intensity = 0.3, Size = 24, Threshold = 0.8}) else RemoveEffect("Bloom") end
     end,
 })
+
 Window:AddSlider({
-    Title = "Bloom Intensity",
-    Tab = ShadersTab,
+    Title = "Intensity",
+    Tab = BloomTab,
     MaxValue = 2,
     AllowDecimals = true,
     Callback = function(amount)
         if Shaders.Bloom then Shaders.Bloom.Intensity = amount end
     end,
 })
+
 Window:AddSlider({
-    Title = "Bloom Size",
-    Tab = ShadersTab,
+    Title = "Size",
+    Tab = BloomTab,
     MaxValue = 50,
     Callback = function(amount)
         if Shaders.Bloom then Shaders.Bloom.Size = amount end
     end,
 })
+
 Window:AddSlider({
-    Title = "Bloom Threshold",
-    Tab = ShadersTab,
+    Title = "Threshold",
+    Tab = BloomTab,
     MaxValue = 1,
     AllowDecimals = true,
     Callback = function(amount)
@@ -259,201 +364,140 @@ Window:AddSlider({
     end,
 })
 
--- 
-Window:AddToggle({
-    Title = "Blur",
-    Description = "Размытие",
-    Tab = ShadersTab,
-    Default = false,
-    Callback = function(bool)
-        if bool then CreateEffect("Blur", {Size = 6}) else RemoveEffect("Blur") end
-    end,
-})
-Window:AddSlider({
-    Title = "Blur Size",
-    Tab = ShadersTab,
-    MaxValue = 20,
-    Callback = function(amount)
-        if Shaders.Blur then Shaders.Blur.Size = amount end
-    end,
-})
-
--- 
-Window:AddToggle({
-    Title = "Color Correction",
-    Tab = ShadersTab,
-    Default = false,
-    Callback = function(bool)
-        if bool then CreateEffect("ColorCorrection") else RemoveEffect("ColorCorrection") end
-    end,
-})
-Window:AddSlider({ Title = "Brightness", Tab = ShadersTab, MaxValue = 1, MinValue = -1, AllowDecimals = true,
-    Callback = function(amount) if Shaders.ColorCorrection then Shaders.ColorCorrection.Brightness = amount end end })
-Window:AddSlider({ Title = "Contrast", Tab = ShadersTab, MaxValue = 1, MinValue = -1, AllowDecimals = true,
-    Callback = function(amount) if Shaders.ColorCorrection then Shaders.ColorCorrection.Contrast = amount end end })
-Window:AddSlider({ Title = "Saturation", Tab = ShadersTab, MaxValue = 1, MinValue = -1, AllowDecimals = true,
-    Callback = function(amount) if Shaders.ColorCorrection then Shaders.ColorCorrection.Saturation = amount end end })
-Window:AddButton({
-    Title = "Random Tint Color",
-    Tab = ShadersTab,
-    Callback = function()
-        if Shaders.ColorCorrection then
-            Shaders.ColorCorrection.TintColor = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255))
-            Window:Notify({ Title = "Yukishimaru", Description = "Tint changed", Duration = 2 })
-        end
-    end,
-})
-
--- 
-Window:AddToggle({
-    Title = "Depth of Field",
-    Tab = ShadersTab,
-    Default = false,
-    Callback = function(bool)
-        if bool then CreateEffect("DepthOfField", {FarIntensity = 0.5, NearIntensity = 0.2, FocusDistance = 10}) else RemoveEffect("DepthOfField") end
-    end,
-})
-Window:AddSlider({ Title = "Far Intensity", Tab = ShadersTab, MaxValue = 1, AllowDecimals = true,
-    Callback = function(amount) if Shaders.DepthOfField then Shaders.DepthOfField.FarIntensity = amount end end })
-Window:AddSlider({ Title = "Near Intensity", Tab = ShadersTab, MaxValue = 1, AllowDecimals = true,
-    Callback = function(amount) if Shaders.DepthOfField then Shaders.DepthOfField.NearIntensity = amount end end })
-Window:AddSlider({ Title = "Focus Distance", Tab = ShadersTab, MaxValue = 30,
-    Callback = function(amount) if Shaders.DepthOfField then Shaders.DepthOfField.FocusDistance = amount end end })
-
--- 
-Window:AddToggle({
+--// ====================== ВКЛАДКА SUN RAYS ======================
+local SunRaysTab = Window:AddTab({
     Title = "Sun Rays",
-    Tab = ShadersTab,
+    Section = "Sun Rays",
+    Icon = "rbxassetid://11293977610"
+})
+
+Window:AddSection({ Name = "Sun Rays Settings", Tab = SunRaysTab })
+
+Window:AddToggle({
+    Title = "Enable Sun Rays",
+    Tab = SunRaysTab,
     Default = false,
     Callback = function(bool)
         if bool then CreateEffect("SunRays", {Intensity = 0.2, Spread = 0.8}) else RemoveEffect("SunRays") end
     end,
 })
-Window:AddSlider({ Title = "Intensity", Tab = ShadersTab, MaxValue = 1, AllowDecimals = true,
-    Callback = function(amount) if Shaders.SunRays then Shaders.SunRays.Intensity = amount end end })
-Window:AddSlider({ Title = "Spread", Tab = ShadersTab, MaxValue = 1, AllowDecimals = true,
-    Callback = function(amount) if Shaders.SunRays then Shaders.SunRays.Spread = amount end end })
 
--- 
-Window:AddToggle({
-    Title = "Atmosphere",
-    Tab = ShadersTab,
-    Default = false,
-    Callback = function(bool)
-        if bool then CreateEffect("Atmosphere", {Density = 0.2, Offset = 0.1, Color = Color3.fromRGB(135, 206, 235)}) else RemoveEffect("Atmosphere") end
+Window:AddSlider({
+    Title = "Intensity",
+    Tab = SunRaysTab,
+    MaxValue = 1,
+    AllowDecimals = true,
+    Callback = function(amount)
+        if Shaders.SunRays then Shaders.SunRays.Intensity = amount end
     end,
 })
-Window:AddSlider({ Title = "Density", Tab = ShadersTab, MaxValue = 1, AllowDecimals = true,
-    Callback = function(amount) if Shaders.Atmosphere then Shaders.Atmosphere.Density = amount end end })
-Window:AddSlider({ Title = "Offset", Tab = ShadersTab, MaxValue = 0.5, AllowDecimals = true,
-    Callback = function(amount) if Shaders.Atmosphere then Shaders.Atmosphere.Offset = amount end end })
-Window:AddButton({
-    Title = "Random Atmosphere Color",
-    Tab = ShadersTab,
-    Callback = function()
-        if Shaders.Atmosphere then
-            Shaders.Atmosphere.Color = Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255))
+
+Window:AddSlider({
+    Title = "Spread",
+    Tab = SunRaysTab,
+    MaxValue = 1,
+    AllowDecimals = true,
+    Callback = function(amount)
+        if Shaders.SunRays then Shaders.SunRays.Spread = amount end
+    end,
+})
+
+-- Опция "Ignore Player" — отключает лучи, если смотреть на персонажа (для 3-го лица)
+local sunRaysIgnorePlayer = false
+Window:AddToggle({
+    Title = "Ignore Player (3rd person)",
+    Description = "Отключает лучи, когда вы смотрите на своего персонажа",
+    Tab = SunRaysTab,
+    Default = false,
+    Callback = function(bool)
+        sunRaysIgnorePlayer = bool
+        -- Если включено, запускаем проверку
+        if bool then
+            local player = Players.LocalPlayer
+            if player and player.Character then
+                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    -- В цикле проверяем направление взгляда
+                    RunService.Heartbeat:Connect(function()
+                        if not Shaders.SunRays then return end
+                        if not sunRaysIgnorePlayer then return end
+                        local char = player.Character
+                        if not char then return end
+                        local head = char:FindFirstChild("Head")
+                        if not head then return end
+                        local cam = workspace.CurrentCamera
+                        if not cam then return end
+                        local direction = (head.Position - cam.CFrame.Position).Unit
+                        local dot = direction:Dot(cam.CFrame.LookVector)
+                        if dot > 0.8 then -- смотрим прямо на персонажа
+                            Shaders.SunRays.Enabled = false
+                        else
+                            Shaders.SunRays.Enabled = true
+                        end
+                    end)
+                end
+            end
+        else
+            -- Восстанавливаем видимость при отключении
+            if Shaders.SunRays then
+                Shaders.SunRays.Enabled = true
+            end
         end
     end,
 })
 
--- 
-Window:AddSection({ Name = "Custom Effects (experimental)", Tab = ShadersTab })
-
-local customEffects = {
-    "Vignette", "Chromatic", "Grain", "Sharpen", "EdgeDetect", "Posterize"
-}
-for _, name in ipairs(customEffects) do
-    Window:AddToggle({
-        Title = name,
-        Tab = ShadersTab,
-        Default = false,
-        Callback = function(bool)
-            if bool then CreateEffect(name) else RemoveEffect(name) end
-        end,
-    })
-end
-
---//
-Window:AddSection({ Name = "Presets — Yukishimaru", Tab = ShadersTab })
-for presetName, presetFunc in pairs(Presets) do
-    Window:AddButton({
-        Title = presetName,
-        Tab = ShadersTab,
-        Callback = presetFunc,
-    })
-end
-
-Window:AddButton({
-    Title = "Reset All",
-    Tab = ShadersTab,
-    Callback = ResetAllShaders,
-})
-
---//
+--// ====================== ПРОФИЛИ ======================
 local ProfilesTab = Window:AddTab({
     Title = "Profiles",
     Section = "Profiles",
     Icon = "rbxassetid://11963373994"
 })
 
-local function SaveProfile(name)
-    local data = {}
-    for effectName, effect in pairs(Shaders) do
-        if effect then
-            data[effectName] = {
-                ClassName = effect.ClassName,
-                Properties = {}
-            }
-            for prop, val in pairs(effect) do
-                if type(val) ~= "function" and prop ~= "Parent" then
-                    data[effectName].Properties[prop] = val
-                end
-            end
-        end
-    end
-    _G.GrayStarProfiles = _G.GrayStarProfiles or {}
-    _G.GrayStarProfiles[name] = data
-    Window:Notify({ Title = "Yukishimaru", Description = "Profile '" .. name .. "' saved", Duration = 2 })
-end
-
-local function LoadProfile(name)
-    local data = _G.GrayStarProfiles and _G.GrayStarProfiles[name]
-    if not data then
-        Window:Notify({ Title = "Error", Description = "Profile not found", Duration = 2 })
-        return
-    end
-    ResetAllShaders()
-    for effectName, effectData in pairs(data) do
-        local effect = CreateEffect(effectName)
-        if effect then
-            for prop, val in pairs(effectData.Properties) do
-                pcall(function() effect[prop] = val end)
-            end
-        end
-    end
-    Window:Notify({ Title = "Yukishimaru", Description = "Profile '" .. name .. "' loaded", Duration = 2 })
-end
-
+local ProfileName = ""
 Window:AddSection({ Name = "Save/Load Profiles", Tab = ProfilesTab })
 Window:AddInput({
     Title = "Profile Name",
     Tab = ProfilesTab,
     Callback = function(text) ProfileName = text end,
 })
-local ProfileName = ""
 Window:AddButton({
     Title = "Save Profile",
     Tab = ProfilesTab,
     Callback = function()
-        if ProfileName ~= "" then SaveProfile(ProfileName) end
+        if ProfileName == "" then return end
+        local data = {}
+        for effectName, effect in pairs(Shaders) do
+            if effect then
+                data[effectName] = { ClassName = effect.ClassName, Properties = {} }
+                for prop, val in pairs(effect) do
+                    if type(val) ~= "function" and prop ~= "Parent" then
+                        data[effectName].Properties[prop] = val
+                    end
+                end
+            end
+        end
+        _G.GrayStarProfiles = _G.GrayStarProfiles or {}
+        _G.GrayStarProfiles[ProfileName] = data
+        Window:Notify({ Title = "Yukishimaru", Description = "Saved '" .. ProfileName .. "'", Duration = 2 })
     end,
 })
 Window:AddButton({
     Title = "Load Profile",
     Tab = ProfilesTab,
     Callback = function()
-        if ProfileName ~= "" then LoadProfile(ProfileName) end
+        if ProfileName == "" then return end
+        local data = _G.GrayStarProfiles and _G.GrayStarProfiles[ProfileName]
+        if not data then Window:Notify({ Title = "Error", Description = "Not found", Duration = 2 }) return end
+        ResetAllShaders()
+        for effectName, effectData in pairs(data) do
+            local effect = CreateEffect(effectName)
+            if effect then
+                for prop, val in pairs(effectData.Properties) do
+                    pcall(function() effect[prop] = val end)
+                end
+            end
+        end
+        Window:Notify({ Title = "Yukishimaru", Description = "Loaded '" .. ProfileName .. "'", Duration = 2 })
     end,
 })
 Window:AddButton({
@@ -461,15 +505,13 @@ Window:AddButton({
     Tab = ProfilesTab,
     Callback = function()
         local list = ""
-        for name, _ in pairs(_G.GrayStarProfiles or {}) do
-            list = list .. name .. "\n"
-        end
+        for name, _ in pairs(_G.GrayStarProfiles or {}) do list = list .. name .. "\n" end
         Window:Notify({ Title = "Profiles", Description = list ~= "" and list or "No profiles", Duration = 5 })
     end,
 })
 
---//
-local Settings = Window:AddTab({
+--// ====================== НАСТРОЙКИ ======================
+local SettingsTab = Window:AddTab({
     Title = "Settings",
     Section = "Settings",
     Icon = "rbxassetid://11293977610",
@@ -478,7 +520,7 @@ local Settings = Window:AddTab({
 local MinimizeKeybind = nil
 Window:AddKeybind({
     Title = "Minimize Keybind",
-    Tab = Settings,
+    Tab = SettingsTab,
     Callback = function(Key)
         Window:SetSetting("Keybind", Key)
         MinimizeKeybind = Key
@@ -487,12 +529,8 @@ Window:AddKeybind({
 
 Window:AddDropdown({
     Title = "Set Theme",
-    Tab = Settings,
-    Options = {
-        ["Light Mode"] = "Light",
-        ["Dark Mode"] = "Dark",
-        ["Extra Dark"] = "Void",
-    },
+    Tab = SettingsTab,
+    Options = { ["Light Mode"] = "Light", ["Dark Mode"] = "Dark", ["Extra Dark"] = "Void" },
     Callback = function(Theme)
         Window:SetTheme(Themes[Theme])
     end,
@@ -501,33 +539,4 @@ Window:AddDropdown({
 Window:AddToggle({
     Title = "UI Blur",
     Default = true,
-    Tab = Settings,
-    Callback = function(bool)
-        Window:SetSetting("Blur", bool)
-    end,
-})
-
-Window:AddSlider({
-    Title = "UI Transparency",
-    Tab = Settings,
-    AllowDecimals = true,
-    MaxValue = 1,
-    Callback = function(amount)
-        Window:SetSetting("Transparency", amount)
-    end,
-})
-
---//
-Window:Notify({
-    Title = "GrayStar Engine",
-    Description = "Yukishimaru — полный шейдер-пак",
-    Duration = 10,
-})
-
---//
-UserInputService.InputBegan:Connect(function(Key, GameProcessed)
-    if GameProcessed then return end
-    if Key.KeyCode == MinimizeKeybind then
-        warn("Minimize key pressed")
-    end
-end)
+ 
