@@ -539,4 +539,99 @@ Window:AddDropdown({
 Window:AddToggle({
     Title = "UI Blur",
     Default = true,
- 
+    Tab = SettingsTab,
+    Callback = function(bool)
+        Window:SetSetting("Blur", bool)
+    end,
+})
+
+Window:AddSlider({
+    Title = "UI Transparency",
+    Tab = SettingsTab,
+    AllowDecimals = true,
+    MaxValue = 1,
+    Callback = function(amount)
+        Window:SetSetting("Transparency", amount)
+    end,
+})
+
+--// Приветствие
+Window:Notify({
+    Title = "GrayStar Engine",
+    Description = "Yukishimaru — полный шейдер-пак",
+    Duration = 10,
+})
+
+--// ====================== ПЛАВНОЕ ПЕРЕТАСКИВАНИЕ (СИЛЬНОЕ ОТСТАВАНИЕ) ======================
+local MainFrame = Window:GetMainFrame()
+local isDragging = false
+local dragOffset = Vector2.new()
+local targetPosition = MainFrame.Position
+local currentPosition = MainFrame.Position
+
+-- Находим заголовок (первый Frame с высотой >= 40)
+local titleBar = nil
+for _, child in pairs(MainFrame:GetChildren()) do
+    if child:IsA("Frame") and child.Size.Y.Offset >= 40 then
+        titleBar = child
+        break
+    end
+end
+if not titleBar then
+    for _, child in pairs(MainFrame:GetChildren()) do
+        if child:IsA("Frame") then
+            titleBar = child
+            break
+        end
+    end
+end
+
+if titleBar then
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isDragging = true
+            local mousePos = input.Position
+            local framePos = MainFrame.AbsolutePosition
+            dragOffset = Vector2.new(mousePos.X - framePos.X, mousePos.Y - framePos.Y)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and isDragging then
+            local newPos = UDim2.new(0, input.Position.X - dragOffset.X, 0, input.Position.Y - dragOffset.Y)
+            targetPosition = newPos
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isDragging = false
+        end
+    end)
+
+    -- Коэффициент 0.015 даёт очень заметное отставание (~1 секунда)
+    RunService.Heartbeat:Connect(function()
+        if not isDragging then
+            local currentX = currentPosition.X.Offset
+            local currentY = currentPosition.Y.Offset
+            local targetX = targetPosition.X.Offset
+            local targetY = targetPosition.Y.Offset
+            local lerpX = currentX + (targetX - currentX) * 0.015
+            local lerpY = currentY + (targetY - currentY) * 0.015
+            MainFrame.Position = UDim2.new(0, lerpX, 0, lerpY)
+            currentPosition = MainFrame.Position
+        else
+            -- при перетаскивании обновляем сразу (чтобы не было рывков)
+            MainFrame.Position = targetPosition
+            currentPosition = targetPosition
+        end
+    end)
+end
+
+--// Keybind
+UserInputService.InputBegan:Connect(function(Key, GameProcessed)
+    if GameProcessed then return end
+    if Key.KeyCode == MinimizeKeybind then
+        warn("Minimize key pressed")
+    end
+end)
