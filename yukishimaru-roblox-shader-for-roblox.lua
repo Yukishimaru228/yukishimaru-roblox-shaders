@@ -1,8 +1,3 @@
---[[
-    GrayStar Shader Engine — Yukishimaru
-    Версия: 4.0 (рефакторинг + плавное перетаскивание + отдельные вкладки)
-]]
-
 --// Services
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
@@ -214,6 +209,74 @@ local Presets = {
         CreateEffect("Bloom", {Intensity = 0.8, Size = 35, Threshold = 0.4})
         CreateEffect("Blur", {Size = 6})
         CreateEffect("ColorCorrection", {Brightness = 0.1, Saturation = 0.3})
+    end,
+
+    -- ========== НОВЫЕ 10 ПРЕСЕТОВ ==========
+
+    ["Pastel"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = 0.15, Contrast = -0.1, Saturation = 0.1, TintColor = Color3.fromRGB(255, 200, 200)})
+        CreateEffect("Bloom", {Intensity = 0.6, Size = 30, Threshold = 0.5})
+        CreateEffect("Blur", {Size = 2})
+    end,
+    ["Cyberpunk"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = -0.1, Contrast = 0.4, Saturation = 0.6, TintColor = Color3.fromRGB(255, 50, 200)})
+        CreateEffect("Bloom", {Intensity = 1.0, Size = 45, Threshold = 0.2})
+        CreateEffect("SunRays", {Intensity = 0.6, Spread = 0.9})
+    end,
+    ["Horror"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = -0.3, Contrast = 0.5, Saturation = -0.5, TintColor = Color3.fromRGB(50, 200, 50)})
+        CreateEffect("DepthOfField", {FarIntensity = 0.8, NearIntensity = 0.1, FocusDistance = 5})
+        CreateEffect("Blur", {Size = 4})
+    end,
+    ["Sunset"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = 0.1, Contrast = 0.1, Saturation = 0.3, TintColor = Color3.fromRGB(255, 150, 50)})
+        CreateEffect("Bloom", {Intensity = 0.7, Size = 25, Threshold = 0.5})
+        CreateEffect("Atmosphere", {Color = Color3.fromRGB(255, 100, 50), Density = 0.3})
+        CreateEffect("SunRays", {Intensity = 0.5, Spread = 0.7})
+    end,
+    ["Aqua"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = -0.05, Contrast = 0.1, Saturation = 0.2, TintColor = Color3.fromRGB(50, 200, 255)})
+        CreateEffect("Bloom", {Intensity = 0.4, Size = 20, Threshold = 0.6})
+        CreateEffect("Atmosphere", {Color = Color3.fromRGB(50, 150, 255), Density = 0.2})
+        CreateEffect("Blur", {Size = 1})
+    end,
+    ["Sepia"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = 0.05, Contrast = 0.1, Saturation = -0.5, TintColor = Color3.fromRGB(200, 150, 100)})
+        CreateEffect("Bloom", {Intensity = 0.2, Size = 15, Threshold = 0.8})
+        CreateEffect("Blur", {Size = 1})
+    end,
+    ["Matrix"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = -0.1, Contrast = 0.3, Saturation = 0.2, TintColor = Color3.fromRGB(50, 255, 50)})
+        CreateEffect("Bloom", {Intensity = 0.3, Size = 10, Threshold = 0.7})
+        CreateEffect("Blur", {Size = 1})
+    end,
+    ["Mystic"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = 0.05, Contrast = 0.1, Saturation = 0.4, TintColor = Color3.fromRGB(150, 100, 255)})
+        CreateEffect("Bloom", {Intensity = 0.9, Size = 40, Threshold = 0.3})
+        CreateEffect("Atmosphere", {Color = Color3.fromRGB(100, 50, 200), Density = 0.2})
+        CreateEffect("DepthOfField", {FarIntensity = 0.3, NearIntensity = 0.1, FocusDistance = 20})
+    end,
+    ["Retro"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = 0.1, Contrast = 0.2, Saturation = 0.1, TintColor = Color3.fromRGB(255, 200, 100)})
+        CreateEffect("Bloom", {Intensity = 0.5, Size = 18, Threshold = 0.7})
+        CreateEffect("Blur", {Size = 3})
+        CreateEffect("Vignette", {Intensity = 0.3})
+    end,
+    ["Aurora"] = function()
+        ResetAllShaders()
+        CreateEffect("ColorCorrection", {Brightness = 0.05, Contrast = 0.1, Saturation = 0.3, TintColor = Color3.fromRGB(100, 255, 200)})
+        CreateEffect("Bloom", {Intensity = 0.6, Size = 30, Threshold = 0.4})
+        CreateEffect("Atmosphere", {Color = Color3.fromRGB(50, 255, 150), Density = 0.15})
+        CreateEffect("SunRays", {Intensity = 0.3, Spread = 0.6})
     end,
 }
 
