@@ -1,4 +1,4 @@
---// 
+--// Services
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
---// 
+--// Library
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/lxte/lates-lib/main/Main.lua"))()
 local Window = Library:CreateWindow({
     Title = "Yukishimaru Shader Engine",
@@ -14,10 +14,10 @@ local Window = Library:CreateWindow({
     Size = UDim2.fromOffset(720, 560),
     Transparency = 0.12,
     Blurring = false, -- отключаем размытие экрана
-    MinimizeKeybind = Enum.KeyCode.RightControl,
+    MinimizeKeybind = Enum.KeyCode.RightControl, -- ПРАВЫЙ CTRL
 })
 
---// 
+--// Themes (без изменений)
 local Themes = {
     Light = {
         Primary = Color3.fromRGB(232, 232, 232),
@@ -59,7 +59,7 @@ local Themes = {
 
 Window:SetTheme(Themes.Dark)
 
---// 
+--// Sections
 Window:AddTabSection({ Name = "Main", Order = 1 })
 Window:AddTabSection({ Name = "Presets", Order = 2 })
 Window:AddTabSection({ Name = "Color Correction", Order = 3 })
@@ -69,7 +69,7 @@ Window:AddTabSection({ Name = "FOV", Order = 6 })
 Window:AddTabSection({ Name = "Profiles", Order = 7 })
 Window:AddTabSection({ Name = "Settings", Order = 8 })
 
---// 
+--// ====================== ХРАНИЛИЩЕ ЭФФЕКТОВ ======================
 local Shaders = {
     Bloom = nil,
     Blur = nil,
@@ -294,14 +294,14 @@ local Presets = {
             Color = Color3.fromRGB(200, 200, 210)
         })
         CreateEffect("ColorCorrection", {
-            Brightness = 0.2,   -- 
+            Brightness = 0.2,
             Contrast = -0.1,
             Saturation = -0.1
         })
     end,
 }
 
---// 
+--// Вкладка MAIN
 local MainTab = Window:AddTab({
     Title = "Main",
     Section = "Main",
@@ -318,7 +318,7 @@ Window:AddButton({
     end,
 })
 
---// 
+--// Вкладка PRESETS
 local PresetsTab = Window:AddTab({
     Title = "Presets",
     Section = "Presets",
@@ -339,7 +339,7 @@ Window:AddButton({
     Callback = ResetAllShaders,
 })
 
---// 
+--// Вкладка COLOR CORRECTION
 local ColorCorrectionTab = Window:AddTab({
     Title = "Color Correction",
     Section = "Color Correction",
@@ -401,7 +401,7 @@ Window:AddButton({
     end,
 })
 
---// 
+--// Вкладка BLOOM
 local BloomTab = Window:AddTab({
     Title = "Bloom",
     Section = "Bloom",
@@ -448,7 +448,7 @@ Window:AddSlider({
     end,
 })
 
---// 
+--// Вкладка SUN RAYS
 local SunRaysTab = Window:AddTab({
     Title = "Sun Rays",
     Section = "Sun Rays",
@@ -486,7 +486,7 @@ Window:AddSlider({
     end,
 })
 
---// 
+--// Вкладка FOV
 local FovTab = Window:AddTab({
     Title = "FOV",
     Section = "FOV",
@@ -539,7 +539,7 @@ Window:AddSlider({
     end,
 })
 
---// 
+--// Вкладка PROFILES
 local ProfilesTab = Window:AddTab({
     Title = "Profiles",
     Section = "Profiles",
@@ -569,7 +569,6 @@ Window:AddButton({
                 end
             end
         end
-        -- 
         data.FOV = { enabled = fovEnabled, value = currentFov }
         _G.YukishimaruProfiles = _G.YukishimaruProfiles or {}
         _G.YukishimaruProfiles[ProfileName] = data
@@ -594,7 +593,6 @@ Window:AddButton({
                 end
             end
         end
-        -- 
         if data.FOV then
             fovEnabled = data.FOV.enabled
             currentFov = data.FOV.value
@@ -628,7 +626,7 @@ Window:AddButton({
     end,
 })
 
---// 
+--// Вкладка SETTINGS
 local SettingsTab = Window:AddTab({
     Title = "Settings",
     Section = "Settings",
@@ -656,7 +654,7 @@ Window:AddDropdown({
 
 Window:AddToggle({
     Title = "UI Blur",
-    Default = false, -- по умолчанию выключено
+    Default = false,
     Tab = SettingsTab,
     Callback = function(bool)
         Window:SetSetting("Blur", bool)
@@ -673,14 +671,14 @@ Window:AddSlider({
     end,
 })
 
---// 
+--// Приветствие
 Window:Notify({
     Title = "Yukishimaru Shader Engine",
     Description = "Yukishimaru — полный шейдер-пак",
     Duration = 10,
 })
 
---// 
+--// Плавное перетаскивание (без изменений)
 local MainFrame = Window:GetMainFrame()
 local isDragging = false
 local dragOffset = Vector2.new()
@@ -744,9 +742,3 @@ if titleBar then
 end
 
 --// 
-UserInputService.InputBegan:Connect(function(Key, GameProcessed)
-    if GameProcessed then return end
-    if Key.KeyCode == MinimizeKeybind then
-        warn("Minimize key pressed")
-    end
-end)
