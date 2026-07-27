@@ -14,7 +14,7 @@ local Window = Library:CreateWindow({
     Size = UDim2.fromOffset(720, 560),
     Transparency = 0.12,
     Blurring = false, -- отключаем размытие экрана
-    MinimizeKeybind = Enum.KeyCode.P,
+    MinimizeKeybind = Enum.KeyCode.RightCtrl,
 })
 
 --// 
