@@ -1,4 +1,4 @@
---// Services
+--// 
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
---// Library (Late's Library)
+--// 
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/lxte/lates-lib/main/Main.lua"))()
 local Window = Library:CreateWindow({
     Title = "Yukishimaru Shader Engine",
@@ -17,7 +17,7 @@ local Window = Library:CreateWindow({
     MinimizeKeybind = Enum.KeyCode.LeftAlt,
 })
 
---// Themes
+--// 
 local Themes = {
     Light = {
         Primary = Color3.fromRGB(232, 232, 232),
@@ -59,7 +59,7 @@ local Themes = {
 
 Window:SetTheme(Themes.Dark)
 
---// Sections
+--// 
 Window:AddTabSection({ Name = "Main", Order = 1 })
 Window:AddTabSection({ Name = "Presets", Order = 2 })
 Window:AddTabSection({ Name = "Color Correction", Order = 3 })
@@ -69,7 +69,7 @@ Window:AddTabSection({ Name = "FOV", Order = 6 })
 Window:AddTabSection({ Name = "Profiles", Order = 7 })
 Window:AddTabSection({ Name = "Settings", Order = 8 })
 
---// ====================== ХРАНИЛИЩЕ ЭФФЕКТОВ ======================
+--// 
 local Shaders = {
     Bloom = nil,
     Blur = nil,
@@ -165,7 +165,7 @@ local function ResetAllShaders()
     Window:Notify({ Title = "Yukishimaru", Description = "Все шейдеры сброшены", Duration = 2 })
 end
 
---// ====================== ПРЕСЕТЫ ======================
+--// Presets
 local Presets = {
     ["Default"] = function()
         ResetAllShaders()
@@ -277,9 +277,31 @@ local Presets = {
         CreateEffect("Atmosphere", {Color = Color3.fromRGB(50, 255, 150), Density = 0.15})
         CreateEffect("SunRays", {Intensity = 0.3, Spread = 0.6})
     end,
+    ["Soapy Graphics (Beta)"] = function()
+        ResetAllShaders()
+        CreateEffect("DepthOfField", {
+            FarIntensity = 1.0,
+            NearIntensity = 0.1,
+            FocusDistance = 10
+        })
+        CreateEffect("Bloom", {
+            Intensity = 0.3,
+            Size = 20,
+            Threshold = 0.8
+        })
+        CreateEffect("Atmosphere", {
+            Density = 0.3,
+            Color = Color3.fromRGB(200, 200, 210)
+        })
+        CreateEffect("ColorCorrection", {
+            Brightness = 0.2,   -- 
+            Contrast = -0.1,
+            Saturation = -0.1
+        })
+    end,
 }
 
---// ====================== ВКЛАДКА MAIN ======================
+--// 
 local MainTab = Window:AddTab({
     Title = "Main",
     Section = "Main",
@@ -296,7 +318,7 @@ Window:AddButton({
     end,
 })
 
---// ====================== ВКЛАДКА PRESETS ======================
+--// 
 local PresetsTab = Window:AddTab({
     Title = "Presets",
     Section = "Presets",
@@ -317,7 +339,7 @@ Window:AddButton({
     Callback = ResetAllShaders,
 })
 
---// ====================== ВКЛАДКА COLOR CORRECTION ======================
+--// 
 local ColorCorrectionTab = Window:AddTab({
     Title = "Color Correction",
     Section = "Color Correction",
@@ -379,7 +401,7 @@ Window:AddButton({
     end,
 })
 
---// ====================== ВКЛАДКА BLOOM ======================
+--// 
 local BloomTab = Window:AddTab({
     Title = "Bloom",
     Section = "Bloom",
@@ -426,7 +448,7 @@ Window:AddSlider({
     end,
 })
 
---// ====================== ВКЛАДКА SUN RAYS ======================
+--// 
 local SunRaysTab = Window:AddTab({
     Title = "Sun Rays",
     Section = "Sun Rays",
@@ -464,43 +486,7 @@ Window:AddSlider({
     end,
 })
 
--- Опция "Ignore Player" — отключает лучи, если смотреть на персонажа (для 3-го лица)
-local sunRaysIgnorePlayer = false
-Window:AddToggle({
-    Title = "Ignore Player (3rd person)",
-    Description = "Отключает лучи, когда вы смотрите на своего персонажа",
-    Tab = SunRaysTab,
-    Default = false,
-    Callback = function(bool)
-        sunRaysIgnorePlayer = bool
-        if bool then
-            local player = Players.LocalPlayer
-            if player and player.Character then
-                RunService.Heartbeat:Connect(function()
-                    if not Shaders.SunRays then return end
-                    if not sunRaysIgnorePlayer then return end
-                    local char = player.Character
-                    if not char then return end
-                    local head = char:FindFirstChild("Head")
-                    if not head then return end
-                    local cam = Workspace.CurrentCamera
-                    if not cam then return end
-                    local direction = (head.Position - cam.CFrame.Position).Unit
-                    local dot = direction:Dot(cam.CFrame.LookVector)
-                    if dot > 0.8 then
-                        Shaders.SunRays.Enabled = false
-                    else
-                        Shaders.SunRays.Enabled = true
-                    end
-                end)
-            end
-        else
-            if Shaders.SunRays then Shaders.SunRays.Enabled = true end
-        end
-    end,
-})
-
---// ====================== ВКЛАДКА FOV ======================
+--// 
 local FovTab = Window:AddTab({
     Title = "FOV",
     Section = "FOV",
@@ -553,7 +539,7 @@ Window:AddSlider({
     end,
 })
 
---// ====================== ПРОФИЛИ ======================
+--// 
 local ProfilesTab = Window:AddTab({
     Title = "Profiles",
     Section = "Profiles",
@@ -583,7 +569,7 @@ Window:AddButton({
                 end
             end
         end
-        -- сохраняем FOV
+        -- 
         data.FOV = { enabled = fovEnabled, value = currentFov }
         _G.YukishimaruProfiles = _G.YukishimaruProfiles or {}
         _G.YukishimaruProfiles[ProfileName] = data
@@ -608,7 +594,7 @@ Window:AddButton({
                 end
             end
         end
-        -- загружаем FOV
+        -- 
         if data.FOV then
             fovEnabled = data.FOV.enabled
             currentFov = data.FOV.value
@@ -642,7 +628,7 @@ Window:AddButton({
     end,
 })
 
---// ====================== НАСТРОЙКИ ======================
+--// 
 local SettingsTab = Window:AddTab({
     Title = "Settings",
     Section = "Settings",
@@ -687,54 +673,14 @@ Window:AddSlider({
     end,
 })
 
---// ====================== КРАСНАЯ КНОПКА ЗАКРЫТИЯ ======================
-local function AddCloseButton()
-    local MainFrame = Window:GetMainFrame()
-    if not MainFrame then return end
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 20, 0, 20)
-    closeBtn.Position = UDim2.new(0, 15, 0, 15)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-    closeBtn.BackgroundTransparency = 0.2
-    closeBtn.Text = ""
-    closeBtn.Parent = MainFrame
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = closeBtn
-    closeBtn.MouseButton1Click:Connect(function()
-        -- полное удаление
-        ResetAllShaders()
-        -- отключаем FOV
-        if fovConnection then
-            fovConnection:Disconnect()
-            fovConnection = nil
-        end
-        Workspace.CurrentCamera.FieldOfView = 70
-        -- удаляем GUI
-        local gui = MainFrame.Parent
-        if gui then gui:Destroy() end
-        -- удаляем всё, что могло остаться
-        for _, v in pairs(CoreGui:GetChildren()) do
-            if v:IsA("ScreenGui") and v.Name == "YukishimaruShaderEngine" then
-                v:Destroy()
-            end
-        end
-        -- очищаем глобальные переменные
-        _G.YukishimaruProfiles = nil
-        _G.AspectEnabled = nil
-        print("Yukishimaru Shader Engine полностью закрыт.")
-    end)
-end
-AddCloseButton()
-
---// Приветствие
+--// 
 Window:Notify({
     Title = "Yukishimaru Shader Engine",
     Description = "Yukishimaru — полный шейдер-пак",
     Duration = 10,
 })
 
---// ====================== ПЛАВНОЕ ПЕРЕТАСКИВАНИЕ (СИЛЬНОЕ ОТСТАВАНИЕ) ======================
+--// 
 local MainFrame = Window:GetMainFrame()
 local isDragging = false
 local dragOffset = Vector2.new()
@@ -797,7 +743,7 @@ if titleBar then
     end)
 end
 
---// Keybind
+--// 
 UserInputService.InputBegan:Connect(function(Key, GameProcessed)
     if GameProcessed then return end
     if Key.KeyCode == MinimizeKeybind then
