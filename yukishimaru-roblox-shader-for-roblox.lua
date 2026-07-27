@@ -4,15 +4,16 @@ local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 
 --// Library (Late's Library)
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/lxte/lates-lib/main/Main.lua"))()
 local Window = Library:CreateWindow({
-    Title = "GrayStar Engine | Yukishimaru",
+    Title = "Yukishimaru Shader Engine",
     Theme = "Dark",
     Size = UDim2.fromOffset(720, 560),
     Transparency = 0.12,
-    Blurring = true,
+    Blurring = false, -- отключаем размытие экрана
     MinimizeKeybind = Enum.KeyCode.LeftAlt,
 })
 
@@ -58,14 +59,15 @@ local Themes = {
 
 Window:SetTheme(Themes.Dark)
 
---// Sections (категории вкладок)
+--// Sections
 Window:AddTabSection({ Name = "Main", Order = 1 })
 Window:AddTabSection({ Name = "Presets", Order = 2 })
 Window:AddTabSection({ Name = "Color Correction", Order = 3 })
 Window:AddTabSection({ Name = "Bloom", Order = 4 })
 Window:AddTabSection({ Name = "Sun Rays", Order = 5 })
-Window:AddTabSection({ Name = "Profiles", Order = 6 })
-Window:AddTabSection({ Name = "Settings", Order = 7 })
+Window:AddTabSection({ Name = "FOV", Order = 6 })
+Window:AddTabSection({ Name = "Profiles", Order = 7 })
+Window:AddTabSection({ Name = "Settings", Order = 8 })
 
 --// ====================== ХРАНИЛИЩЕ ЭФФЕКТОВ ======================
 local Shaders = {
@@ -75,7 +77,6 @@ local Shaders = {
     DepthOfField = nil,
     SunRays = nil,
     Atmosphere = nil,
-    -- кастомные (заглушки)
     Vignette = nil,
     Chromatic = nil,
     Grain = nil,
@@ -210,9 +211,7 @@ local Presets = {
         CreateEffect("Blur", {Size = 6})
         CreateEffect("ColorCorrection", {Brightness = 0.1, Saturation = 0.3})
     end,
-
-    -- ========== НОВЫЕ 10 ПРЕСЕТОВ ==========
-
+    -- Новые 10 пресетов
     ["Pastel"] = function()
         ResetAllShaders()
         CreateEffect("ColorCorrection", {Brightness = 0.15, Contrast = -0.1, Saturation = 0.1, TintColor = Color3.fromRGB(255, 200, 200)})
@@ -293,7 +292,7 @@ Window:AddButton({
     Description = "Показать уведомление",
     Tab = MainTab,
     Callback = function()
-        Window:Notify({ Title = "Yukishimaru", Description = "Привет! Это GrayStar Engine.", Duration = 3 })
+        Window:Notify({ Title = "Yukishimaru", Description = "Привет! Это Yukishimaru Shader Engine.", Duration = 3 })
     end,
 })
 
@@ -474,37 +473,82 @@ Window:AddToggle({
     Default = false,
     Callback = function(bool)
         sunRaysIgnorePlayer = bool
-        -- Если включено, запускаем проверку
         if bool then
             local player = Players.LocalPlayer
             if player and player.Character then
-                local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    -- В цикле проверяем направление взгляда
-                    RunService.Heartbeat:Connect(function()
-                        if not Shaders.SunRays then return end
-                        if not sunRaysIgnorePlayer then return end
-                        local char = player.Character
-                        if not char then return end
-                        local head = char:FindFirstChild("Head")
-                        if not head then return end
-                        local cam = workspace.CurrentCamera
-                        if not cam then return end
-                        local direction = (head.Position - cam.CFrame.Position).Unit
-                        local dot = direction:Dot(cam.CFrame.LookVector)
-                        if dot > 0.8 then -- смотрим прямо на персонажа
-                            Shaders.SunRays.Enabled = false
-                        else
-                            Shaders.SunRays.Enabled = true
-                        end
-                    end)
-                end
+                RunService.Heartbeat:Connect(function()
+                    if not Shaders.SunRays then return end
+                    if not sunRaysIgnorePlayer then return end
+                    local char = player.Character
+                    if not char then return end
+                    local head = char:FindFirstChild("Head")
+                    if not head then return end
+                    local cam = Workspace.CurrentCamera
+                    if not cam then return end
+                    local direction = (head.Position - cam.CFrame.Position).Unit
+                    local dot = direction:Dot(cam.CFrame.LookVector)
+                    if dot > 0.8 then
+                        Shaders.SunRays.Enabled = false
+                    else
+                        Shaders.SunRays.Enabled = true
+                    end
+                end)
             end
         else
-            -- Восстанавливаем видимость при отключении
-            if Shaders.SunRays then
-                Shaders.SunRays.Enabled = true
+            if Shaders.SunRays then Shaders.SunRays.Enabled = true end
+        end
+    end,
+})
+
+--// ====================== ВКЛАДКА FOV ======================
+local FovTab = Window:AddTab({
+    Title = "FOV",
+    Section = "FOV",
+    Icon = "rbxassetid://11293977610"
+})
+
+local fovEnabled = false
+local currentFov = 70
+local fovConnection = nil
+
+Window:AddSection({ Name = "Field of View", Tab = FovTab })
+
+Window:AddToggle({
+    Title = "Enable FOV Changer",
+    Tab = FovTab,
+    Default = false,
+    Callback = function(bool)
+        fovEnabled = bool
+        if bool then
+            if not fovConnection then
+                fovConnection = RunService.Heartbeat:Connect(function()
+                    if fovEnabled then
+                        Workspace.CurrentCamera.FieldOfView = currentFov
+                    end
+                end)
             end
+            Workspace.CurrentCamera.FieldOfView = currentFov
+        else
+            if fovConnection then
+                fovConnection:Disconnect()
+                fovConnection = nil
+            end
+            Workspace.CurrentCamera.FieldOfView = 70
+        end
+    end,
+})
+
+Window:AddSlider({
+    Title = "FOV Value",
+    Description = "1 — 120",
+    Tab = FovTab,
+    MaxValue = 120,
+    MinValue = 1,
+    Default = 70,
+    Callback = function(amount)
+        currentFov = amount
+        if fovEnabled then
+            Workspace.CurrentCamera.FieldOfView = currentFov
         end
     end,
 })
@@ -539,8 +583,10 @@ Window:AddButton({
                 end
             end
         end
-        _G.GrayStarProfiles = _G.GrayStarProfiles or {}
-        _G.GrayStarProfiles[ProfileName] = data
+        -- сохраняем FOV
+        data.FOV = { enabled = fovEnabled, value = currentFov }
+        _G.YukishimaruProfiles = _G.YukishimaruProfiles or {}
+        _G.YukishimaruProfiles[ProfileName] = data
         Window:Notify({ Title = "Yukishimaru", Description = "Saved '" .. ProfileName .. "'", Duration = 2 })
     end,
 })
@@ -549,15 +595,38 @@ Window:AddButton({
     Tab = ProfilesTab,
     Callback = function()
         if ProfileName == "" then return end
-        local data = _G.GrayStarProfiles and _G.GrayStarProfiles[ProfileName]
+        local data = _G.YukishimaruProfiles and _G.YukishimaruProfiles[ProfileName]
         if not data then Window:Notify({ Title = "Error", Description = "Not found", Duration = 2 }) return end
         ResetAllShaders()
         for effectName, effectData in pairs(data) do
-            local effect = CreateEffect(effectName)
-            if effect then
-                for prop, val in pairs(effectData.Properties) do
-                    pcall(function() effect[prop] = val end)
+            if effectName ~= "FOV" then
+                local effect = CreateEffect(effectName)
+                if effect then
+                    for prop, val in pairs(effectData.Properties) do
+                        pcall(function() effect[prop] = val end)
+                    end
                 end
+            end
+        end
+        -- загружаем FOV
+        if data.FOV then
+            fovEnabled = data.FOV.enabled
+            currentFov = data.FOV.value
+            if fovEnabled then
+                if not fovConnection then
+                    fovConnection = RunService.Heartbeat:Connect(function()
+                        if fovEnabled then
+                            Workspace.CurrentCamera.FieldOfView = currentFov
+                        end
+                    end)
+                end
+                Workspace.CurrentCamera.FieldOfView = currentFov
+            else
+                if fovConnection then
+                    fovConnection:Disconnect()
+                    fovConnection = nil
+                end
+                Workspace.CurrentCamera.FieldOfView = 70
             end
         end
         Window:Notify({ Title = "Yukishimaru", Description = "Loaded '" .. ProfileName .. "'", Duration = 2 })
@@ -568,7 +637,7 @@ Window:AddButton({
     Tab = ProfilesTab,
     Callback = function()
         local list = ""
-        for name, _ in pairs(_G.GrayStarProfiles or {}) do list = list .. name .. "\n" end
+        for name, _ in pairs(_G.YukishimaruProfiles or {}) do list = list .. name .. "\n" end
         Window:Notify({ Title = "Profiles", Description = list ~= "" and list or "No profiles", Duration = 5 })
     end,
 })
@@ -601,7 +670,7 @@ Window:AddDropdown({
 
 Window:AddToggle({
     Title = "UI Blur",
-    Default = true,
+    Default = false, -- по умолчанию выключено
     Tab = SettingsTab,
     Callback = function(bool)
         Window:SetSetting("Blur", bool)
@@ -618,9 +687,49 @@ Window:AddSlider({
     end,
 })
 
+--// ====================== КРАСНАЯ КНОПКА ЗАКРЫТИЯ ======================
+local function AddCloseButton()
+    local MainFrame = Window:GetMainFrame()
+    if not MainFrame then return end
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 20, 0, 20)
+    closeBtn.Position = UDim2.new(0, 15, 0, 15)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    closeBtn.BackgroundTransparency = 0.2
+    closeBtn.Text = ""
+    closeBtn.Parent = MainFrame
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = closeBtn
+    closeBtn.MouseButton1Click:Connect(function()
+        -- полное удаление
+        ResetAllShaders()
+        -- отключаем FOV
+        if fovConnection then
+            fovConnection:Disconnect()
+            fovConnection = nil
+        end
+        Workspace.CurrentCamera.FieldOfView = 70
+        -- удаляем GUI
+        local gui = MainFrame.Parent
+        if gui then gui:Destroy() end
+        -- удаляем всё, что могло остаться
+        for _, v in pairs(CoreGui:GetChildren()) do
+            if v:IsA("ScreenGui") and v.Name == "YukishimaruShaderEngine" then
+                v:Destroy()
+            end
+        end
+        -- очищаем глобальные переменные
+        _G.YukishimaruProfiles = nil
+        _G.AspectEnabled = nil
+        print("Yukishimaru Shader Engine полностью закрыт.")
+    end)
+end
+AddCloseButton()
+
 --// Приветствие
 Window:Notify({
-    Title = "GrayStar Engine",
+    Title = "Yukishimaru Shader Engine",
     Description = "Yukishimaru — полный шейдер-пак",
     Duration = 10,
 })
@@ -632,7 +741,6 @@ local dragOffset = Vector2.new()
 local targetPosition = MainFrame.Position
 local currentPosition = MainFrame.Position
 
--- Находим заголовок (первый Frame с высотой >= 40)
 local titleBar = nil
 for _, child in pairs(MainFrame:GetChildren()) do
     if child:IsA("Frame") and child.Size.Y.Offset >= 40 then
@@ -672,7 +780,6 @@ if titleBar then
         end
     end)
 
-    -- Коэффициент 0.015 даёт очень заметное отставание (~1 секунда)
     RunService.Heartbeat:Connect(function()
         if not isDragging then
             local currentX = currentPosition.X.Offset
@@ -684,7 +791,6 @@ if titleBar then
             MainFrame.Position = UDim2.new(0, lerpX, 0, lerpY)
             currentPosition = MainFrame.Position
         else
-            -- при перетаскивании обновляем сразу (чтобы не было рывков)
             MainFrame.Position = targetPosition
             currentPosition = targetPosition
         end
