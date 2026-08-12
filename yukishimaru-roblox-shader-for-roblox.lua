@@ -1,33 +1,9 @@
 --[[
-============================================================
-                  YUKI SHADER ENGINE
-               PURPLE LIQUID GLASS UI
-============================================================
-
 Author:
     Yukishimaru
 
 TikTok:
     @yukishimaruoffc
-
-Features:
-    • Purple Liquid Glass interface
-    • Animated bubbles
-    • Bubble magnet to mouse
-    • Bubble gravity outside window
-    • Home
-    • Shader Presets
-    • Shader Settings
-    • Right Alt open / close
-    • Smooth collapse
-    • Exit confirmation
-    • 19 presets
-    • LIVE shader settings
-    • No shader recreation while dragging sliders
-    • Safe cleanup of Yuki Shader effects only
-    • Motion Blur
-    • Vignette
-============================================================
 ]]
 
 --============================================================
