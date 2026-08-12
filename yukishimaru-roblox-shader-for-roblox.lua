@@ -1,10 +1,38 @@
 --[[
+============================================================
+                  YUKI SHADER ENGINE
+               PURPLE LIQUID GLASS UI
+============================================================
+
 Author:
     Yukishimaru
 
 TikTok:
     @yukishimaruoffc
---[[
+
+Features:
+    • Purple Liquid Glass interface
+    • Animated bubbles
+    • Bubble magnet to mouse
+    • Bubble gravity outside window
+    • Home
+    • Shader Presets
+    • Shader Settings
+    • Right Alt open / close
+    • Smooth collapse
+    • Exit confirmation
+    • 19 presets
+    • LIVE shader settings
+    • No shader recreation while dragging sliders
+    • Safe cleanup of Yuki Shader effects only
+    • Motion Blur
+    • Vignette
+============================================================
+]]
+
+--============================================================
+-- SERVICES
+--============================================================
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -15,6 +43,9 @@ local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 
+--============================================================
+-- CONFIG
+--============================================================
 
 local CONFIG = {
     Width = 800,
@@ -49,6 +80,10 @@ local CONFIG = {
     VignetteName = "YukiShader_Vignette"
 }
 
+--============================================================
+-- GLOBAL STATE
+--============================================================
+
 local Alive = true
 local Collapsed = false
 local ConfirmOpen = false
@@ -78,6 +113,9 @@ local Effects = {
     MotionBlur = nil
 }
 
+--============================================================
+-- SHADER STATE
+--============================================================
 
 local ShaderState = {
     Saturation = 0,
@@ -110,6 +148,10 @@ local ShaderState = {
     Vignette = false,
     VignetteStrength = 0
 }
+
+--============================================================
+-- HELPERS
+--============================================================
 
 local function Connect(signal, callback)
     local connection = signal:Connect(callback)
@@ -235,6 +277,9 @@ local function SafeDestroy(object)
     end
 end
 
+--============================================================
+-- SCREEN GUI
+--============================================================
 
 local ScreenGui = Instance.new(
     "ScreenGui"
@@ -264,6 +309,9 @@ end)
 ScreenGui.Parent =
     CoreGui
 
+--============================================================
+-- MAIN WINDOW
+--============================================================
 
 local Main = Instance.new("Frame")
 
@@ -325,6 +373,9 @@ AddGradient(
     35
 )
 
+--============================================================
+-- OUTER GLOW
+--============================================================
 
 local OuterGlow =
     Instance.new("Frame")
@@ -369,6 +420,9 @@ AddCorner(
     60
 )
 
+--============================================================
+-- BUBBLE LAYER
+--============================================================
 
 local BubbleLayer =
     Instance.new("Frame")
@@ -397,6 +451,10 @@ BubbleLayer.ZIndex =
 BubbleLayer.Parent =
     Main
 
+--============================================================
+-- CONTENT
+--============================================================
+
 local Content =
     Instance.new("Frame")
 
@@ -421,6 +479,9 @@ Content.ZIndex =
 Content.Parent =
     Main
 
+--============================================================
+-- HEADER
+--============================================================
 
 local Header =
     Instance.new("Frame")
@@ -454,6 +515,9 @@ Header.ZIndex =
 Header.Parent =
     Content
 
+--============================================================
+-- LOGO
+--============================================================
 
 local Logo =
     Instance.new("Frame")
@@ -576,6 +640,10 @@ AddCorner(
     2
 )
 
+--============================================================
+-- HEADER TEXT
+--============================================================
+
 local Title =
     Instance.new("TextLabel")
 
@@ -658,6 +726,9 @@ Subtitle.ZIndex =
 Subtitle.Parent =
     Header
 
+--============================================================
+-- STATUS
+--============================================================
 
 local Status =
     Instance.new("Frame")
@@ -782,6 +853,9 @@ StatusText.ZIndex =
 StatusText.Parent =
     Status
 
+--============================================================
+-- PAGE CONTAINER
+--============================================================
 
 local PageContainer =
     Instance.new("Frame")
@@ -815,6 +889,9 @@ PageContainer.ZIndex =
 PageContainer.Parent =
     Content
 
+--============================================================
+-- HOME PAGE
+--============================================================
 
 local HomePage =
     Instance.new("Frame")
@@ -1013,6 +1090,9 @@ HomeDescription.ZIndex =
 HomeDescription.Parent =
     HomeCard
 
+--============================================================
+-- AUTHOR CARD
+--============================================================
 
 local AuthorCard =
     Instance.new("Frame")
@@ -1150,6 +1230,9 @@ AuthorText.ZIndex =
 AuthorText.Parent =
     AuthorCard
 
+--============================================================
+-- ENGINE CARD
+--============================================================
 
 local EngineCard =
     Instance.new("Frame")
@@ -1364,6 +1447,9 @@ EngineHint.ZIndex =
 EngineHint.Parent =
     EngineCard
 
+--============================================================
+-- PRESETS PAGE
+--============================================================
 
 local PresetsPage =
     Instance.new("Frame")
@@ -1568,6 +1654,9 @@ PresetLayout.SortOrder =
 PresetLayout.Parent =
     PresetScroll
 
+--============================================================
+-- SETTINGS PAGE
+--============================================================
 
 local SettingsPage =
     Instance.new("Frame")
@@ -1811,6 +1900,10 @@ SettingsScroll.ZIndex =
 SettingsScroll.Parent =
     SettingsPage
 
+--============================================================
+-- EFFECT FACTORY
+--============================================================
+
 local function CreateEffect(
     effectType,
     properties
@@ -1886,6 +1979,9 @@ local function CreateEffect(
     return effect
 end
 
+--============================================================
+-- DESTROY OUR EFFECTS
+--============================================================
 
 local function DestroyShaderEffects()
     for key, effect in pairs(
@@ -1921,6 +2017,9 @@ local function DestroyShaderEffects()
     end
 end
 
+--============================================================
+-- VIGNETTE
+--============================================================
 
 local function DestroyVignette()
     if VignetteGui then
@@ -2124,6 +2223,9 @@ local function UpdateVignette()
     )
 end
 
+--============================================================
+-- MOTION BLUR
+--============================================================
 
 local function StopMotionBlur()
     if MotionBlurEffect then
@@ -2169,6 +2271,9 @@ local function StartMotionBlur()
     end
 end
 
+--============================================================
+-- MOTION BLUR RENDER LOOP
+--============================================================
 
 Connect(
     RunService.RenderStepped,
@@ -2266,6 +2371,9 @@ Connect(
     end
 )
 
+--============================================================
+-- DEFAULT STATE RESET
+--============================================================
 
 local function ResetShaderState()
     ShaderState.Saturation = 0
@@ -2297,6 +2405,9 @@ local function ResetShaderState()
         "Default"
 end
 
+--============================================================
+-- LIVE EFFECT UPDATERS
+--============================================================
 
 local function UpdateColorCorrection()
     local effect =
@@ -2394,6 +2505,9 @@ local function UpdateAtmosphere()
         ShaderState.AtmosphereColor
 end
 
+--============================================================
+-- ENSURE EFFECT
+--============================================================
 
 local function EnsureEffect(effectType)
     if Effects[effectType] then
@@ -2488,6 +2602,9 @@ local function EnsureEffect(effectType)
     return nil
 end
 
+--============================================================
+-- LIVE SETTING CHANGE
+--============================================================
 
 local function SetLiveSetting(
     key,
@@ -2654,6 +2771,9 @@ local function SetLiveSetting(
     end
 end
 
+--============================================================
+-- PRESETS
+--============================================================
 
 local Presets = {
 
@@ -3422,6 +3542,10 @@ local Presets = {
     end
 }
 
+--============================================================
+-- PRESET LIST
+--============================================================
+
 local PresetNames = {
     "Default",
     "Cinematic",
@@ -3446,6 +3570,9 @@ local PresetNames = {
 
 local RefreshAllSliders
 
+--============================================================
+-- APPLY PRESET
+--============================================================
 
 local function SyncStateFromLoadedPreset()
     local colorCorrection =
@@ -3574,6 +3701,9 @@ local function ApplyPreset(
     end
 end
 
+--============================================================
+-- PRESET BUTTONS
+--============================================================
 
 for index, presetName in ipairs(
     PresetNames
@@ -3892,6 +4022,9 @@ PresetScroll.CanvasSize =
         ) * 63
     )
 
+--============================================================
+-- SETTINGS DEFINITIONS
+--============================================================
 
 local SettingDefinitions = {
     {
@@ -4012,9 +4145,15 @@ local SettingDefinitions = {
     }
 }
 
+--============================================================
+-- SETTINGS UI REFERENCES
+--============================================================
 
 local SliderUI = {}
 
+--============================================================
+-- SLIDER CREATOR
+--============================================================
 
 local function CreateSlider(
     parent,
@@ -4474,6 +4613,9 @@ for index, definition in ipairs(
     )
 end
 
+--============================================================
+-- UPDATE ALL SLIDER UI
+--============================================================
 
 RefreshAllSliders = function()
     for _, definition in ipairs(
@@ -4513,6 +4655,9 @@ SettingsScroll.CanvasSize =
         + 140
     )
 
+--============================================================
+-- TOGGLE CREATOR
+--============================================================
 
 local ToggleUI = {}
 
@@ -4862,6 +5007,9 @@ SettingsScroll.CanvasSize =
         + 20
     )
 
+--============================================================
+-- RESET SETTINGS
+--============================================================
 
 Connect(
     ResetSettingsButton.MouseButton1Click,
@@ -4883,6 +5031,10 @@ Connect(
             "Preset: Default"
     end
 )
+
+--============================================================
+-- NAVIGATION
+--============================================================
 
 local Navigation =
     Instance.new("Frame")
@@ -5532,6 +5684,9 @@ local ExitButton =
         BuildExitIcon
     )
 
+--============================================================
+-- PAGE SWITCHING
+--============================================================
 
 local Pages = {
     Home = HomePage,
@@ -5615,6 +5770,9 @@ Connect(
     end
 )
 
+--============================================================
+-- COLLAPSE
+--============================================================
 
 local function SetCollapsed(
     state
@@ -5736,6 +5894,10 @@ Connect(
         end
     end
 )
+
+--============================================================
+-- EXIT CONFIRMATION
+--============================================================
 
 local Overlay =
     Instance.new("Frame")
@@ -6120,6 +6282,9 @@ Connect(
     CloseConfirmation
 )
 
+--============================================================
+-- UNLOAD
+--============================================================
 
 local function Unload()
 
@@ -6168,6 +6333,9 @@ Connect(
     Unload
 )
 
+--============================================================
+-- DRAG
+--============================================================
 
 Connect(
     Header.InputBegan,
@@ -6236,6 +6404,9 @@ Connect(
     end
 )
 
+--============================================================
+-- BUBBLES
+--============================================================
 
 local RNG =
     Random.new()
@@ -6339,6 +6510,9 @@ for i = 1, CONFIG.BubbleCount do
     CreateBubble(i)
 end
 
+--============================================================
+-- BUBBLE PHYSICS
+--============================================================
 
 Connect(
     RunService.RenderStepped,
@@ -6537,6 +6711,9 @@ Connect(
     end
 )
 
+--============================================================
+-- BUBBLE VISUAL ANIMATION
+--============================================================
 
 task.spawn(function()
 
@@ -6591,6 +6768,9 @@ task.spawn(function()
     end
 end)
 
+--============================================================
+-- GLOW ANIMATION
+--============================================================
 
 task.spawn(function()
 
@@ -6648,6 +6828,9 @@ task.spawn(function()
     end
 end)
 
+--============================================================
+-- STATUS ANIMATION
+--============================================================
 
 task.spawn(function()
 
@@ -6701,6 +6884,9 @@ task.spawn(function()
     end
 end)
 
+--============================================================
+-- DRAG HEADER EVENTS
+--============================================================
 
 Connect(
     Header.InputBegan,
@@ -6721,6 +6907,9 @@ Connect(
     end
 )
 
+--============================================================
+-- INITIAL STATE
+--============================================================
 
 SavedPosition =
     Main.Position
@@ -6733,6 +6922,9 @@ SwitchPage(
     "Home"
 )
 
+--============================================================
+-- OPEN ANIMATION
+--============================================================
 
 Main.Size =
     UDim2.fromOffset(
@@ -6759,3 +6951,7 @@ Tween(
     Enum.EasingStyle.Quint,
     Enum.EasingDirection.Out
 )
+
+--============================================================
+-- READY
+--============================================================
