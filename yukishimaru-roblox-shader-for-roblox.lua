@@ -18,6 +18,7 @@ local Lighting = game:GetService("Lighting")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 --============================================================
 -- CONFIG
@@ -125,6 +126,14 @@ local ShaderState = {
     VignetteStrength = 0
 }
 
+-- UI Settings (FOV и Aspect Ratio)
+local UISettings = {
+    FOVEnabled = false,
+    FOVValue = 70,
+    AspectEnabled = false,
+    AspectValue = 0.6
+}
+
 --============================================================
 -- HELPERS
 --============================================================
@@ -141,7 +150,6 @@ local function DisconnectAll()
             connection:Disconnect()
         end)
     end
-
     table.clear(Connections)
 end
 
@@ -2248,102 +2256,140 @@ local function StartMotionBlur()
 end
 
 --============================================================
--- MOTION BLUR RENDER LOOP
+-- RENDER LOOP с принудительным обновлением всех эффектов
 --============================================================
 
 Connect(
     RunService.RenderStepped,
     function(deltaTime)
+        if not Alive then return end
 
-        if not Alive then
-            return
+        -- FOV Changer
+        if UISettings.FOVEnabled and Camera then
+            Camera.FieldOfView = UISettings.FOVValue
+        elseif not UISettings.FOVEnabled and Camera then
+            Camera.FieldOfView = 70
         end
 
-        if not ShaderState.MotionBlur then
+        -- Aspect Ratio
+        if UISettings.AspectEnabled and Camera then
+            local cf = Camera.CFrame
+            Camera.CFrame = cf * CFrame.new(0,0,0, 1,0,0, 0,UISettings.AspectValue,0, 0,0,1)
+        end
 
+        -- ==== ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ЭФФЕКТОВ (каждый кадр) ====
+        Lighting.PostProcessing = true
+
+        -- ColorCorrection
+        if Effects.ColorCorrection then
+            local cc = Effects.ColorCorrection
+            cc.Saturation = ShaderState.Saturation
+            cc.Brightness = ShaderState.Brightness
+            cc.Contrast = ShaderState.Contrast
+        else
+            local cc = Instance.new("ColorCorrectionEffect")
+            cc.Name = CONFIG.ShaderPrefix .. "ColorCorrection"
+            cc.Saturation = ShaderState.Saturation
+            cc.Brightness = ShaderState.Brightness
+            cc.Contrast = ShaderState.Contrast
+            cc.Parent = Lighting
+            Effects.ColorCorrection = cc
+        end
+
+        -- Bloom
+        if Effects.Bloom then
+            Effects.Bloom.Intensity = ShaderState.BloomIntensity
+            Effects.Bloom.Size = ShaderState.BloomSize
+            Effects.Bloom.Threshold = ShaderState.BloomThreshold
+        elseif ShaderState.BloomIntensity > 0 then
+            local bloom = Instance.new("BloomEffect")
+            bloom.Name = CONFIG.ShaderPrefix .. "Bloom"
+            bloom.Intensity = ShaderState.BloomIntensity
+            bloom.Size = ShaderState.BloomSize
+            bloom.Threshold = ShaderState.BloomThreshold
+            bloom.Parent = Lighting
+            Effects.Bloom = bloom
+        end
+
+        -- Blur
+        if Effects.Blur then
+            Effects.Blur.Size = ShaderState.Blur
+        elseif ShaderState.Blur > 0 then
+            local blur = Instance.new("BlurEffect")
+            blur.Name = CONFIG.ShaderPrefix .. "Blur"
+            blur.Size = ShaderState.Blur
+            blur.Parent = Lighting
+            Effects.Blur = blur
+        end
+
+        -- SunRays
+        if Effects.SunRays then
+            Effects.SunRays.Intensity = ShaderState.SunRaysIntensity
+            Effects.SunRays.Spread = ShaderState.SunRaysSpread
+        elseif ShaderState.SunRaysIntensity > 0 then
+            local sr = Instance.new("SunRaysEffect")
+            sr.Name = CONFIG.ShaderPrefix .. "SunRays"
+            sr.Intensity = ShaderState.SunRaysIntensity
+            sr.Spread = ShaderState.SunRaysSpread
+            sr.Parent = Lighting
+            Effects.SunRays = sr
+        end
+
+        -- DepthOfField
+        if Effects.DepthOfField then
+            Effects.DepthOfField.FarIntensity = ShaderState.DOFFarIntensity
+            Effects.DepthOfField.NearIntensity = ShaderState.DOFNearIntensity
+            Effects.DepthOfField.FocusDistance = ShaderState.DOFFocusDistance
+        elseif ShaderState.DOFFarIntensity > 0 or ShaderState.DOFNearIntensity > 0 then
+            local dof = Instance.new("DepthOfFieldEffect")
+            dof.Name = CONFIG.ShaderPrefix .. "DepthOfField"
+            dof.FarIntensity = ShaderState.DOFFarIntensity
+            dof.NearIntensity = ShaderState.DOFNearIntensity
+            dof.FocusDistance = ShaderState.DOFFocusDistance
+            dof.Parent = Lighting
+            Effects.DepthOfField = dof
+        end
+
+        -- Atmosphere
+        if Effects.Atmosphere then
+            Effects.Atmosphere.Density = ShaderState.AtmosphereDensity
+            Effects.Atmosphere.Color = ShaderState.AtmosphereColor
+        elseif ShaderState.AtmosphereDensity > 0 then
+            local atm = Instance.new("Atmosphere")
+            atm.Name = CONFIG.ShaderPrefix .. "Atmosphere"
+            atm.Density = ShaderState.AtmosphereDensity
+            atm.Color = ShaderState.AtmosphereColor
+            atm.Parent = Lighting
+            Effects.Atmosphere = atm
+        end
+
+        -- Motion Blur
+        if not ShaderState.MotionBlur then
             if MotionBlurEffect then
                 StopMotionBlur()
             end
-
             return
         end
 
-        local camera =
-            workspace.CurrentCamera
-
-        if not camera then
-            return
-        end
+        local camera = workspace.CurrentCamera
+        if not camera then return end
 
         StartMotionBlur()
 
         if not LastCameraCFrame then
-            LastCameraCFrame =
-                camera.CFrame
+            LastCameraCFrame = camera.CFrame
             return
         end
 
-        local current =
-            camera.CFrame
-
-        local positionDelta =
-            (
-                current.Position
-                -
-                LastCameraCFrame.Position
-            ).Magnitude
-
-        local a1, b1, c1 =
-            current:ToOrientation()
-
-        local a2, b2, c2 =
-            LastCameraCFrame:ToOrientation()
-
-        local rotationDelta =
-            math.abs(
-                a1 - a2
-            )
-            +
-            math.abs(
-                b1 - b2
-            )
-            +
-            math.abs(
-                c1 - c2
-            )
-
-        local movement =
-            positionDelta
-            +
-            rotationDelta * 18
-
-        local target =
-            Clamp(
-                movement
-                * ShaderState.MotionBlurStrength
-                * 12,
-
-                0,
-                24
-            )
-
-        MotionBlurEffect.Size =
-            MotionBlurEffect.Size
-            +
-            (
-                target
-                -
-                MotionBlurEffect.Size
-            )
-            *
-            Clamp(
-                deltaTime * 12,
-                0,
-                1
-            )
-
-        LastCameraCFrame =
-            current
+        local current = camera.CFrame
+        local positionDelta = (current.Position - LastCameraCFrame.Position).Magnitude
+        local a1, b1, c1 = current:ToOrientation()
+        local a2, b2, c2 = LastCameraCFrame:ToOrientation()
+        local rotationDelta = math.abs(a1 - a2) + math.abs(b1 - b2) + math.abs(c1 - c2)
+        local movement = positionDelta + rotationDelta * 18
+        local target = Clamp(movement * ShaderState.MotionBlurStrength * 12, 0, 24)
+        MotionBlurEffect.Size = MotionBlurEffect.Size + (target - MotionBlurEffect.Size) * Clamp(deltaTime * 12, 0, 1)
+        LastCameraCFrame = current
     end
 )
 
@@ -2382,107 +2428,35 @@ local function ResetShaderState()
 end
 
 --============================================================
--- LIVE EFFECT UPDATERS
+-- LIVE EFFECT UPDATERS (оставлены для совместимости, но теперь не нужны)
 --============================================================
 
 local function UpdateColorCorrection()
-    local effect =
-        Effects.ColorCorrection
-
-    if not effect then
-        return
-    end
-
-    effect.Saturation =
-        ShaderState.Saturation
-
-    effect.Brightness =
-        ShaderState.Brightness
-
-    effect.Contrast =
-        ShaderState.Contrast
+    -- больше не требуется, так как обновляется в RenderStepped
 end
 
 local function UpdateBlur()
-    local effect =
-        Effects.Blur
-
-    if not effect then
-        return
-    end
-
-    effect.Size =
-        ShaderState.Blur
+    -- больше не требуется
 end
 
 local function UpdateBloom()
-    local effect =
-        Effects.Bloom
-
-    if not effect then
-        return
-    end
-
-    effect.Intensity =
-        ShaderState.BloomIntensity
-
-    effect.Size =
-        ShaderState.BloomSize
-
-    effect.Threshold =
-        ShaderState.BloomThreshold
+    -- больше не требуется
 end
 
 local function UpdateSunRays()
-    local effect =
-        Effects.SunRays
-
-    if not effect then
-        return
-    end
-
-    effect.Intensity =
-        ShaderState.SunRaysIntensity
-
-    effect.Spread =
-        ShaderState.SunRaysSpread
+    -- больше не требуется
 end
 
 local function UpdateDOF()
-    local effect =
-        Effects.DepthOfField
-
-    if not effect then
-        return
-    end
-
-    effect.FarIntensity =
-        ShaderState.DOFFarIntensity
-
-    effect.NearIntensity =
-        ShaderState.DOFNearIntensity
-
-    effect.FocusDistance =
-        ShaderState.DOFFocusDistance
+    -- больше не требуется
 end
 
 local function UpdateAtmosphere()
-    local effect =
-        Effects.Atmosphere
-
-    if not effect then
-        return
-    end
-
-    effect.Density =
-        ShaderState.AtmosphereDensity
-
-    effect.Color =
-        ShaderState.AtmosphereColor
+    -- больше не требуется
 end
 
 --============================================================
--- ENSURE EFFECT
+-- ENSURE EFFECT (используется только при создании пресетов)
 --============================================================
 
 local function EnsureEffect(effectType)
@@ -2579,7 +2553,7 @@ local function EnsureEffect(effectType)
 end
 
 --============================================================
--- LIVE SETTING CHANGE
+-- LIVE SETTING CHANGE (обновляем только ShaderState, рендер сам применит)
 --============================================================
 
 local function SetLiveSetting(
@@ -2595,156 +2569,7 @@ local function SetLiveSetting(
     EnginePreset.Text =
         "Preset: Custom"
 
-    if key == "Saturation"
-        or key == "Brightness"
-        or key == "Contrast" then
-
-        EnsureEffect(
-            "ColorCorrection"
-        )
-
-        UpdateColorCorrection()
-
-    elseif key == "Blur" then
-
-        if value <= 0 then
-
-            SafeDestroy(
-                Effects.Blur
-            )
-
-            Effects.Blur =
-                nil
-
-        else
-
-            EnsureEffect(
-                "Blur"
-            )
-
-            UpdateBlur()
-        end
-
-    elseif key == "BloomIntensity"
-        or key == "BloomSize"
-        or key == "BloomThreshold" then
-
-        if ShaderState.BloomIntensity <= 0 then
-
-            SafeDestroy(
-                Effects.Bloom
-            )
-
-            Effects.Bloom =
-                nil
-
-        else
-
-            EnsureEffect(
-                "Bloom"
-            )
-
-            UpdateBloom()
-        end
-
-    elseif key == "SunRaysIntensity"
-        or key == "SunRaysSpread" then
-
-        if ShaderState.SunRaysIntensity <= 0 then
-
-            SafeDestroy(
-                Effects.SunRays
-            )
-
-            Effects.SunRays =
-                nil
-
-        else
-
-            EnsureEffect(
-                "SunRays"
-            )
-
-            UpdateSunRays()
-        end
-
-    elseif key == "DOFFarIntensity"
-        or key == "DOFNearIntensity"
-        or key == "DOFFocusDistance" then
-
-        if ShaderState.DOFFarIntensity <= 0
-            and ShaderState.DOFNearIntensity <= 0 then
-
-            SafeDestroy(
-                Effects.DepthOfField
-            )
-
-            Effects.DepthOfField =
-                nil
-
-        else
-
-            EnsureEffect(
-                "DepthOfField"
-            )
-
-            UpdateDOF()
-        end
-
-    elseif key == "AtmosphereDensity" then
-
-        if value <= 0 then
-
-            SafeDestroy(
-                Effects.Atmosphere
-            )
-
-            Effects.Atmosphere =
-                nil
-
-        else
-
-            EnsureEffect(
-                "Atmosphere"
-            )
-
-            UpdateAtmosphere()
-        end
-
-    elseif key == "MotionBlurStrength" then
-
-        if value <= 0 then
-
-            ShaderState.MotionBlur =
-                false
-
-            StopMotionBlur()
-
-        else
-
-            ShaderState.MotionBlur =
-                true
-
-            StartMotionBlur()
-        end
-
-    elseif key == "VignetteStrength" then
-
-        if value <= 0 then
-
-            ShaderState.Vignette =
-                false
-
-            DestroyVignette()
-
-        else
-
-            ShaderState.Vignette =
-                true
-
-            UpdateVignette()
-        end
-    end
+    -- Теперь не нужно вызывать обновления, RenderStepped всё сделает сам.
 end
 
 --============================================================
@@ -3515,11 +3340,46 @@ local Presets = {
                 Saturation = -0.1
             }
         )
+    end,
+
+    -- ======== НОВЫЙ ПРЕСЕТ ========
+ ["Saturation My Love"] = function()
+    ResetShaderState()
+    DestroyShaderEffects()
+    DestroyVignette()
+    StopMotionBlur()
+
+    -- Насыщенность на максимум, яркость 0.05
+    CreateEffect("ColorCorrection", {
+        Saturation = 1,
+        Brightness = 0,
+        Contrast = -0.10
+    })
+
+    -- Лёгкая атмосфера
+    CreateEffect("Atmosphere", {
+        Density = 0.01,
+        Color = Color3.fromRGB(200, 200, 200)
+    })
+
+    -- Блум на самый минимум (едва заметный)
+    CreateEffect("Bloom", {
+        Intensity = 0,
+        Size = 0,
+        Threshold = 1
+    })
+
+    -- FOV = 120
+    UISettings.FOVValue = 120
+    UISettings.FOVEnabled = true
+    if Camera then
+        Camera.FieldOfView = 120
     end
+end
 }
 
 --============================================================
--- PRESET LIST
+-- PRESET LIST (добавлено новое имя)
 --============================================================
 
 local PresetNames = {
@@ -3541,10 +3401,12 @@ local PresetNames = {
     "Mystic",
     "Retro",
     "Aurora",
-    "Soapy Graphics (Beta)"
+    "Soapy Graphics (Beta)",
+    "Saturation My Love"  -- <-- новый пресет
 }
 
 local RefreshAllSliders
+local RefreshUIToggles
 
 --============================================================
 -- APPLY PRESET
@@ -3638,8 +3500,6 @@ local function ApplyPreset(
         return
     end
 
-    -- Every new preset starts clean:
-    -- previous manual changes are discarded.
     DestroyShaderEffects()
     DestroyVignette()
     StopMotionBlur()
@@ -3648,12 +3508,8 @@ local function ApplyPreset(
     CurrentPreset =
         presetName
 
-    -- Load the selected preset.
     preset()
 
-    -- Read the values created by the preset into ShaderState.
-    -- This is the important part that makes the Settings sliders
-    -- control the selected preset instead of starting from zero.
     SyncStateFromLoadedPreset()
 
     EnginePreset.Text =
@@ -3663,22 +3519,17 @@ local function ApplyPreset(
     EngineStatus.Text =
         "ACTIVE"
 
-    -- Synchronize slider positions and values with the preset.
     if RefreshAllSliders then
         RefreshAllSliders()
     end
 
-    if ToggleUI then
-        for _, refresh in pairs(
-            ToggleUI
-        ) do
-            refresh()
-        end
+    if RefreshUIToggles then
+        RefreshUIToggles()
     end
 end
 
 --============================================================
--- PRESET BUTTONS
+-- PRESET BUTTONS (код остаётся без изменений, генерируется автоматически)
 --============================================================
 
 for index, presetName in ipairs(
@@ -4126,6 +3977,7 @@ local SettingDefinitions = {
 --============================================================
 
 local SliderUI = {}
+local UIToggleRefs = {}
 
 --============================================================
 -- SLIDER CREATOR
@@ -4632,7 +4484,7 @@ SettingsScroll.CanvasSize =
     )
 
 --============================================================
--- TOGGLE CREATOR
+-- TOGGLE CREATOR (existing)
 --============================================================
 
 local ToggleUI = {}
@@ -4914,6 +4766,7 @@ local function CreateToggle(
     Refresh()
 end
 
+-- Existing toggles: Motion Blur and Vignette
 CreateToggle(
     SettingsScroll,
     "Motion Blur",
@@ -4973,15 +4826,312 @@ CreateToggle(
     end
 )
 
-SettingsScroll.CanvasSize =
-    UDim2.fromOffset(
-        0,
-        #SettingDefinitions
-        * 65
-        + 8
-        + 2 * 53
-        + 20
-    )
+--============================================================
+-- UI TOGGLES & SLIDERS FOR FOV AND ASPECT RATIO
+--============================================================
+
+local newToggleIndex = 3
+local function CreateUIToggle(name, getter, setter)
+    CreateToggle(SettingsScroll, name, newToggleIndex, getter, setter)
+    newToggleIndex = newToggleIndex + 1
+end
+
+-- FOV Enable
+CreateUIToggle(
+    "Enable FOV Changer",
+    function() return UISettings.FOVEnabled end,
+    function(value)
+        UISettings.FOVEnabled = value
+        if not value and Camera then
+            Camera.FieldOfView = 70
+        end
+    end
+)
+
+-- FOV Slider
+do
+    local definition = {
+        Name = "FOV",
+        Key = "FOVValue",
+        Min = 1,
+        Max = 120,
+        Step = 1,
+        Default = 70
+    }
+    local function CreateUISlider(parent, def, indexOffset)
+        local row = Instance.new("Frame")
+        row.Name = def.Key
+        row.Position = UDim2.fromOffset(8, (#SettingDefinitions * 65 + 8 + (newToggleIndex - 1) * 53 + 8) + (indexOffset - 1) * 65)
+        row.Size = UDim2.new(1, -16, 0, 58)
+        row.BackgroundColor3 = Color3.fromRGB(39,18,56)
+        row.BackgroundTransparency = 0.18
+        row.BorderSizePixel = 0
+        row.ZIndex = 23
+        row.Parent = parent
+        AddCorner(row, 13)
+        AddStroke(row, CONFIG.PurpleLight, 0.91, 1)
+
+        local label = Instance.new("TextLabel")
+        label.Position = UDim2.fromOffset(13, 7)
+        label.Size = UDim2.new(1, -100, 0, 18)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamMedium
+        label.Text = def.Name
+        label.TextSize = 10
+        label.TextColor3 = CONFIG.Text
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.ZIndex = 24
+        label.Parent = row
+
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.AnchorPoint = Vector2.new(1,0)
+        valueLabel.Position = UDim2.new(1, -13, 0, 7)
+        valueLabel.Size = UDim2.fromOffset(70, 18)
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.Font = Enum.Font.GothamSemibold
+        valueLabel.TextSize = 9
+        valueLabel.TextColor3 = CONFIG.PurpleLight
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+        valueLabel.ZIndex = 24
+        valueLabel.Parent = row
+
+        local track = Instance.new("Frame")
+        track.Position = UDim2.fromOffset(13, 37)
+        track.Size = UDim2.new(1, -26, 0, 6)
+        track.BackgroundColor3 = Color3.fromRGB(68,38,84)
+        track.BorderSizePixel = 0
+        track.ZIndex = 24
+        track.Parent = row
+        AddCorner(track, 10)
+
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.fromScale(0,1)
+        fill.BackgroundColor3 = CONFIG.Purple
+        fill.BorderSizePixel = 0
+        fill.ZIndex = 25
+        fill.Parent = track
+        AddCorner(fill, 10)
+
+        local knob = Instance.new("Frame")
+        knob.AnchorPoint = Vector2.new(0.5,0.5)
+        knob.Position = UDim2.fromScale(0,0.5)
+        knob.Size = UDim2.fromOffset(12,12)
+        knob.BackgroundColor3 = CONFIG.White
+        knob.BorderSizePixel = 0
+        knob.ZIndex = 26
+        knob.Parent = track
+        AddCorner(knob, 99)
+
+        local dragging = false
+
+        local function SetUIValue(value, instant)
+            local normalized = (value - def.Min) / (def.Max - def.Min)
+            normalized = Clamp(normalized, 0, 1)
+            valueLabel.Text = string.format("%.2f", value)
+            if instant then
+                fill.Size = UDim2.fromScale(normalized, 1)
+                knob.Position = UDim2.fromScale(normalized, 0.5)
+            else
+                Tween(fill, {Size = UDim2.fromScale(normalized, 1)}, 0.08, Enum.EasingStyle.Sine)
+                Tween(knob, {Position = UDim2.fromScale(normalized, 0.5)}, 0.08, Enum.EasingStyle.Sine)
+            end
+        end
+
+        local function UpdateFromMouse(mouseX)
+            local trackWidth = math.max(track.AbsoluteSize.X, 1)
+            local normalized = Clamp((mouseX - track.AbsolutePosition.X) / trackWidth, 0, 1)
+            local rawValue = def.Min + (def.Max - def.Min) * normalized
+            local value = math.round(rawValue / def.Step) * def.Step
+            value = Clamp(value, def.Min, def.Max)
+            UISettings[def.Key] = value
+            SetUIValue(value, false)
+            if UISettings.FOVEnabled and Camera then
+                Camera.FieldOfView = value
+            end
+        end
+
+        Connect(track.InputBegan, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                UpdateFromMouse(input.Position.X)
+            end
+        end)
+
+        Connect(UserInputService.InputChanged, function(input)
+            if not dragging then return end
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                UpdateFromMouse(input.Position.X)
+            end
+        end)
+
+        Connect(UserInputService.InputEnded, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+
+        if not SliderUI["FOVValue"] then
+            SliderUI["FOVValue"] = { SetValue = SetUIValue }
+        end
+        SetUIValue(def.Default, true)
+    end
+
+    CreateUISlider(SettingsScroll, definition, 1)
+end
+
+-- Aspect Ratio Enable
+CreateUIToggle(
+    "Enable Aspect Ratio",
+    function() return UISettings.AspectEnabled end,
+    function(value)
+        UISettings.AspectEnabled = value
+    end
+)
+
+-- Aspect Ratio Slider
+do
+    local definition = {
+        Name = "Ratio Value",
+        Key = "AspectValue",
+        Min = 0.05,
+        Max = 1.14,
+        Step = 0.01,
+        Default = 0.6
+    }
+    local function CreateUISlider2(parent, def, indexOffset)
+        local row = Instance.new("Frame")
+        row.Name = def.Key
+        row.Position = UDim2.fromOffset(8, (#SettingDefinitions * 65 + 8 + (newToggleIndex - 1) * 53 + 8) + (indexOffset - 1) * 65)
+        row.Size = UDim2.new(1, -16, 0, 58)
+        row.BackgroundColor3 = Color3.fromRGB(39,18,56)
+        row.BackgroundTransparency = 0.18
+        row.BorderSizePixel = 0
+        row.ZIndex = 23
+        row.Parent = parent
+        AddCorner(row, 13)
+        AddStroke(row, CONFIG.PurpleLight, 0.91, 1)
+
+        local label = Instance.new("TextLabel")
+        label.Position = UDim2.fromOffset(13, 7)
+        label.Size = UDim2.new(1, -100, 0, 18)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamMedium
+        label.Text = def.Name
+        label.TextSize = 10
+        label.TextColor3 = CONFIG.Text
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.ZIndex = 24
+        label.Parent = row
+
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.AnchorPoint = Vector2.new(1,0)
+        valueLabel.Position = UDim2.new(1, -13, 0, 7)
+        valueLabel.Size = UDim2.fromOffset(70, 18)
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.Font = Enum.Font.GothamSemibold
+        valueLabel.TextSize = 9
+        valueLabel.TextColor3 = CONFIG.PurpleLight
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+        valueLabel.ZIndex = 24
+        valueLabel.Parent = row
+
+        local track = Instance.new("Frame")
+        track.Position = UDim2.fromOffset(13, 37)
+        track.Size = UDim2.new(1, -26, 0, 6)
+        track.BackgroundColor3 = Color3.fromRGB(68,38,84)
+        track.BorderSizePixel = 0
+        track.ZIndex = 24
+        track.Parent = row
+        AddCorner(track, 10)
+
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.fromScale(0,1)
+        fill.BackgroundColor3 = CONFIG.Purple
+        fill.BorderSizePixel = 0
+        fill.ZIndex = 25
+        fill.Parent = track
+        AddCorner(fill, 10)
+
+        local knob = Instance.new("Frame")
+        knob.AnchorPoint = Vector2.new(0.5,0.5)
+        knob.Position = UDim2.fromScale(0,0.5)
+        knob.Size = UDim2.fromOffset(12,12)
+        knob.BackgroundColor3 = CONFIG.White
+        knob.BorderSizePixel = 0
+        knob.ZIndex = 26
+        knob.Parent = track
+        AddCorner(knob, 99)
+
+        local dragging = false
+
+        local function SetUIValue(value, instant)
+            local normalized = (value - def.Min) / (def.Max - def.Min)
+            normalized = Clamp(normalized, 0, 1)
+            valueLabel.Text = string.format("%.2f", value)
+            if instant then
+                fill.Size = UDim2.fromScale(normalized, 1)
+                knob.Position = UDim2.fromScale(normalized, 0.5)
+            else
+                Tween(fill, {Size = UDim2.fromScale(normalized, 1)}, 0.08, Enum.EasingStyle.Sine)
+                Tween(knob, {Position = UDim2.fromScale(normalized, 0.5)}, 0.08, Enum.EasingStyle.Sine)
+            end
+        end
+
+        local function UpdateFromMouse(mouseX)
+            local trackWidth = math.max(track.AbsoluteSize.X, 1)
+            local normalized = Clamp((mouseX - track.AbsolutePosition.X) / trackWidth, 0, 1)
+            local rawValue = def.Min + (def.Max - def.Min) * normalized
+            local value = math.round(rawValue / def.Step) * def.Step
+            value = Clamp(value, def.Min, def.Max)
+            UISettings[def.Key] = value
+            SetUIValue(value, false)
+        end
+
+        Connect(track.InputBegan, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                UpdateFromMouse(input.Position.X)
+            end
+        end)
+
+        Connect(UserInputService.InputChanged, function(input)
+            if not dragging then return end
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                UpdateFromMouse(input.Position.X)
+            end
+        end)
+
+        Connect(UserInputService.InputEnded, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+
+        if not SliderUI["AspectValue"] then
+            SliderUI["AspectValue"] = { SetValue = SetUIValue }
+        end
+        SetUIValue(def.Default, true)
+    end
+
+    CreateUISlider2(SettingsScroll, definition, 2)
+end
+
+-- Update canvas size
+local totalRows = #SettingDefinitions * 65 + 8 + (newToggleIndex - 1) * 53 + 8 + 2 * 65 + 20
+SettingsScroll.CanvasSize = UDim2.fromOffset(0, totalRows)
+
+-- Refresh function for UI toggles
+RefreshUIToggles = function()
+    for name, refresh in pairs(ToggleUI) do
+        refresh()
+    end
+    if SliderUI["FOVValue"] then
+        SliderUI["FOVValue"].SetValue(UISettings.FOVValue, true)
+    end
+    if SliderUI["AspectValue"] then
+        SliderUI["AspectValue"].SetValue(UISettings.AspectValue, true)
+    end
+end
 
 --============================================================
 -- RESET SETTINGS
@@ -4996,12 +5146,7 @@ Connect(
         )
 
         RefreshAllSliders()
-
-        for _, refresh in pairs(
-            ToggleUI
-        ) do
-            refresh()
-        end
+        RefreshUIToggles()
 
         EnginePreset.Text =
             "Preset: Default"
@@ -5052,7 +5197,6 @@ local ButtonGap = 5
 
 local function BuildHomeIcon(parent)
 
-    -- Body: solid white
     local body =
         Instance.new("Frame")
 
@@ -5071,7 +5215,6 @@ local function BuildHomeIcon(parent)
 
     AddCorner(body, 3)
 
-    -- Roof: two clean white strokes meeting at the center
     local roofLeft =
         Instance.new("Frame")
 
@@ -5102,7 +5245,6 @@ local function BuildHomeIcon(parent)
     roofRight.Rotation = -31
     roofRight.Parent = parent
 
-    -- Door: also pure white; no purple cut-out
     local door =
         Instance.new("Frame")
 
@@ -5153,7 +5295,6 @@ end
 
 local function BuildSettingsIcon(parent)
 
-    -- Pure white cog. The center is also white so the whole icon is one color.
     local center =
         Instance.new("Frame")
 
@@ -5227,7 +5368,6 @@ end
 
 local function BuildExitIcon(parent)
 
-    -- Door body - solid white
     local door =
         Instance.new("Frame")
 
@@ -5246,7 +5386,6 @@ local function BuildExitIcon(parent)
 
     AddCorner(door, 3)
 
-    -- Visible white exit arrow, kept completely inside the icon holder
     local arrow =
         Instance.new("Frame")
 
@@ -6533,8 +6672,6 @@ Connect(
 
             local time = os.clock()
 
-            -- Every bubble gets its own angle and radius.
-            -- This creates a proper halo around the cursor instead of one blob.
             for _, bubble in ipairs(Bubbles) do
 
                 local angle =
@@ -6579,7 +6716,6 @@ Connect(
                 local dy =
                     targetY - bubble.Y
 
-                -- Spring toward the bubble's own point on the ring.
                 bubble.VX =
                     bubble.VX
                     + dx * CONFIG.BubbleMagnet * 0.92 * deltaTime
@@ -6588,7 +6724,6 @@ Connect(
                     bubble.VY
                     + dy * CONFIG.BubbleMagnet * 0.92 * deltaTime
 
-                -- Tangential movement makes the halo feel alive.
                 bubble.VX =
                     bubble.VX
                     - math.sin(angle) * 7 * deltaTime
