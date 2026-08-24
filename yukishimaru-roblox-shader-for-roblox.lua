@@ -126,13 +126,97 @@ local ShaderState = {
     VignetteStrength = 0
 }
 
--- UI Settings (FOV и Aspect Ratio)
+--============================================================
+-- FOV SETTINGS (АГРЕССИВНОЕ ОБНОВЛЕНИЕ)
+--============================================================
+
 local UISettings = {
     FOVEnabled = false,
-    FOVValue = 70,
+    FOVValue = 80,
     AspectEnabled = false,
     AspectValue = 0.6
 }
+
+-- Сохраняем оригинальное FOV при старте
+local OriginalFOV = 70
+pcall(function()
+    local plr = Players.LocalPlayer
+    if plr and plr:FindFirstChild("PlayerData") and plr.PlayerData:FindFirstChild("Settings") and plr.PlayerData.Settings:FindFirstChild("Game") then
+        local fov = plr.PlayerData.Settings.Game:FindFirstChild("FieldOfView")
+        if fov and fov:IsA("ValueBase") then
+            OriginalFOV = fov.Value
+            UISettings.FOVValue = fov.Value
+        end
+    end
+end)
+
+-- Прямая установка без лишних проверок (максимальная скорость)
+local function SetGameFOV(value)
+    local plr = Players.LocalPlayer
+    if plr and plr.PlayerData and plr.PlayerData.Settings and plr.PlayerData.Settings.Game then
+        local fov = plr.PlayerData.Settings.Game:FindFirstChild("FieldOfView")
+        if fov then
+            fov.Value = value
+        end
+    end
+    -- Дублируем в Camera на всякий случай
+    if Camera then
+        Camera.FieldOfView = value
+    end
+end
+
+local function RestoreGameFOV()
+    SetGameFOV(OriginalFOV)
+end
+
+-- ОТДЕЛЬНЫЙ ЦИКЛ С ПРИОРИТЕТОМ LAST (выполняется после ВСЕГО)
+local FOVStepConnection = nil
+local FOVHeartbeatConnection = nil
+
+local function StartFOVLoop()
+    if FOVStepConnection then return end
+    FOVStepConnection = RunService:BindToRenderStep("YukiFOV_Force", Enum.RenderPriority.Last, function()
+        if UISettings.FOVEnabled and Alive then
+            SetGameFOV(UISettings.FOVValue)
+        end
+    end)
+    -- Дополнительно дублируем в Heartbeat (на случай, если игра меняет FOV между кадрами)
+    if not FOVHeartbeatConnection then
+        FOVHeartbeatConnection = RunService.Heartbeat:Connect(function()
+            if UISettings.FOVEnabled and Alive then
+                SetGameFOV(UISettings.FOVValue)
+            end
+        end)
+    end
+end
+
+local function StopFOVLoop()
+    if FOVStepConnection then
+        RunService:UnbindFromRenderStep("YukiFOV_Force")
+        FOVStepConnection = nil
+    end
+    if FOVHeartbeatConnection then
+        FOVHeartbeatConnection:Disconnect()
+        FOVHeartbeatConnection = nil
+    end
+end
+
+--============================================================
+-- PERFORMANCE / LIGHTING STATE
+--============================================================
+
+local PerformanceState = {
+    FullBright = false,
+    NoLag = false
+}
+
+local OriginalLightingState = {
+    Saved = false,
+    Brightness = nil,
+    Ambient = nil
+}
+
+local NoLagConnection = nil
 
 --============================================================
 -- HELPERS
@@ -258,6 +342,106 @@ local function SafeDestroy(object)
         pcall(function()
             object:Destroy()
         end)
+    end
+end
+
+
+--============================================================
+-- FULLBRIGHT / NO LAG
+--============================================================
+
+local function SetFullBright(enabled)
+    PerformanceState.FullBright = enabled
+
+    if enabled then
+        if not OriginalLightingState.Saved then
+            OriginalLightingState.Brightness = Lighting.Brightness
+            OriginalLightingState.Ambient = Lighting.Ambient
+            OriginalLightingState.Saved = true
+        end
+
+        Lighting.Brightness = 5
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    elseif OriginalLightingState.Saved then
+        Lighting.Brightness = OriginalLightingState.Brightness
+        Lighting.Ambient = OriginalLightingState.Ambient
+        OriginalLightingState.Saved = false
+    end
+end
+
+local function ApplyNoLagToInstance(asset)
+    if not asset or not (asset:IsA("Part") or asset:IsA("MeshPart")) then
+        return
+    end
+
+    if asset.Transparency >= 1 then
+        return
+    end
+
+    if not asset:GetAttribute("YukiOldMaterial") then
+        asset:SetAttribute("YukiOldMaterial", asset.Material.Name)
+    end
+
+    asset.Material = Enum.Material.SmoothPlastic
+
+    if asset:IsA("MeshPart") then
+        if asset.TextureID ~= "" and not asset:GetAttribute("YukiOldTextureID") then
+            asset:SetAttribute("YukiOldTextureID", asset.TextureID)
+        end
+        asset.TextureID = ""
+    end
+end
+
+local function ApplyNoLag()
+    for _, asset in ipairs(workspace:GetDescendants()) do
+        ApplyNoLagToInstance(asset)
+    end
+
+    if NoLagConnection then
+        NoLagConnection:Disconnect()
+        NoLagConnection = nil
+    end
+
+    NoLagConnection = workspace.DescendantAdded:Connect(function(child)
+        if not PerformanceState.NoLag then
+            return
+        end
+
+        task.defer(function()
+            if PerformanceState.NoLag then
+                ApplyNoLagToInstance(child)
+            end
+        end)
+    end)
+end
+
+local function RestoreNoLag()
+    if NoLagConnection then
+        NoLagConnection:Disconnect()
+        NoLagConnection = nil
+    end
+
+    for _, asset in ipairs(workspace:GetDescendants()) do
+        if asset:IsA("Part") or asset:IsA("MeshPart") then
+            local oldMaterial = asset:GetAttribute("YukiOldMaterial")
+            if oldMaterial then
+                for _, enumItem in ipairs(Enum.Material:GetEnumItems()) do
+                    if enumItem.Name == oldMaterial then
+                        asset.Material = enumItem
+                        break
+                    end
+                end
+                asset:SetAttribute("YukiOldMaterial", nil)
+            end
+
+            if asset:IsA("MeshPart") then
+                local oldTexture = asset:GetAttribute("YukiOldTextureID")
+                if oldTexture then
+                    asset.TextureID = oldTexture
+                    asset:SetAttribute("YukiOldTextureID", nil)
+                end
+            end
+        end
     end
 end
 
@@ -2256,7 +2440,7 @@ local function StartMotionBlur()
 end
 
 --============================================================
--- RENDER LOOP с принудительным обновлением всех эффектов
+-- RENDER LOOP (БЕЗ FOV, только эффекты)
 --============================================================
 
 Connect(
@@ -2264,14 +2448,13 @@ Connect(
     function(deltaTime)
         if not Alive then return end
 
-        -- FOV Changer
-        if UISettings.FOVEnabled and Camera then
-            Camera.FieldOfView = UISettings.FOVValue
-        elseif not UISettings.FOVEnabled and Camera then
-            Camera.FieldOfView = 70
+        -- FullBright
+        if PerformanceState.FullBright then
+            Lighting.Brightness = 5
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
         end
 
-        -- Aspect Ratio
+        -- Aspect Ratio (если нужен)
         if UISettings.AspectEnabled and Camera then
             local cf = Camera.CFrame
             Camera.CFrame = cf * CFrame.new(0,0,0, 1,0,0, 0,UISettings.AspectValue,0, 0,0,1)
@@ -2368,28 +2551,26 @@ Connect(
             if MotionBlurEffect then
                 StopMotionBlur()
             end
-            return
+        else
+            local camera = workspace.CurrentCamera
+            if camera then
+                StartMotionBlur()
+
+                if not LastCameraCFrame then
+                    LastCameraCFrame = camera.CFrame
+                else
+                    local current = camera.CFrame
+                    local positionDelta = (current.Position - LastCameraCFrame.Position).Magnitude
+                    local a1, b1, c1 = current:ToOrientation()
+                    local a2, b2, c2 = LastCameraCFrame:ToOrientation()
+                    local rotationDelta = math.abs(a1 - a2) + math.abs(b1 - b2) + math.abs(c1 - c2)
+                    local movement = positionDelta + rotationDelta * 18
+                    local target = Clamp(movement * ShaderState.MotionBlurStrength * 12, 0, 24)
+                    MotionBlurEffect.Size = MotionBlurEffect.Size + (target - MotionBlurEffect.Size) * Clamp(deltaTime * 12, 0, 1)
+                    LastCameraCFrame = current
+                end
+            end
         end
-
-        local camera = workspace.CurrentCamera
-        if not camera then return end
-
-        StartMotionBlur()
-
-        if not LastCameraCFrame then
-            LastCameraCFrame = camera.CFrame
-            return
-        end
-
-        local current = camera.CFrame
-        local positionDelta = (current.Position - LastCameraCFrame.Position).Magnitude
-        local a1, b1, c1 = current:ToOrientation()
-        local a2, b2, c2 = LastCameraCFrame:ToOrientation()
-        local rotationDelta = math.abs(a1 - a2) + math.abs(b1 - b2) + math.abs(c1 - c2)
-        local movement = positionDelta + rotationDelta * 18
-        local target = Clamp(movement * ShaderState.MotionBlurStrength * 12, 0, 24)
-        MotionBlurEffect.Size = MotionBlurEffect.Size + (target - MotionBlurEffect.Size) * Clamp(deltaTime * 12, 0, 1)
-        LastCameraCFrame = current
     end
 )
 
@@ -2428,7 +2609,7 @@ local function ResetShaderState()
 end
 
 --============================================================
--- LIVE EFFECT UPDATERS (оставлены для совместимости, но теперь не нужны)
+-- LIVE EFFECT UPDATERS (оставлены для совместимости)
 --============================================================
 
 local function UpdateColorCorrection()
@@ -2553,7 +2734,7 @@ local function EnsureEffect(effectType)
 end
 
 --============================================================
--- LIVE SETTING CHANGE (обновляем только ShaderState, рендер сам применит)
+-- LIVE SETTING CHANGE
 --============================================================
 
 local function SetLiveSetting(
@@ -2568,8 +2749,6 @@ local function SetLiveSetting(
 
     EnginePreset.Text =
         "Preset: Custom"
-
-    -- Теперь не нужно вызывать обновления, RenderStepped всё сделает сам.
 end
 
 --============================================================
@@ -3342,44 +3521,37 @@ local Presets = {
         )
     end,
 
-    -- ======== НОВЫЙ ПРЕСЕТ ========
- ["Saturation My Love"] = function()
-    ResetShaderState()
-    DestroyShaderEffects()
-    DestroyVignette()
-    StopMotionBlur()
+    ["Saturation My Love"] = function()
+        ResetShaderState()
+        DestroyShaderEffects()
+        DestroyVignette()
+        StopMotionBlur()
 
-    -- Насыщенность на максимум, яркость 0.05
-    CreateEffect("ColorCorrection", {
-        Saturation = 1,
-        Brightness = 0.05,
-        Contrast = -0.10
-    })
+        CreateEffect("ColorCorrection", {
+            Saturation = 1,
+            Brightness = 0.05,
+            Contrast = -0.10
+        })
 
-    -- Лёгкая атмосфера
-    CreateEffect("Atmosphere", {
-        Density = 0.01,
-        Color = Color3.fromRGB(0, 0, 0)
-    })
+        CreateEffect("Atmosphere", {
+            Density = 0.01,
+            Color = Color3.fromRGB(0, 0, 0)
+        })
 
-    -- Блум на самый минимум (едва заметный)
-    CreateEffect("Bloom", {
-        Intensity = 0,
-        Size = 0,
-        Threshold = 0
-    })
+        CreateEffect("Bloom", {
+            Intensity = 0,
+            Size = 0,
+            Threshold = 0
+        })
 
-    -- FOV = 120
-    UISettings.FOVValue = 120
-    UISettings.FOVEnabled = true
-    if Camera then
-        Camera.FieldOfView = 120
+        UISettings.FOVValue = 120
+        UISettings.FOVEnabled = true
+        SetGameFOV(120)
     end
-end
 }
 
 --============================================================
--- PRESET LIST (добавлено новое имя)
+-- PRESET LIST
 --============================================================
 
 local PresetNames = {
@@ -3402,7 +3574,7 @@ local PresetNames = {
     "Retro",
     "Aurora",
     "Soapy Graphics (Beta)",
-    "Saturation My Love"  -- <-- новый пресет
+    "Saturation My Love"
 }
 
 local RefreshAllSliders
@@ -3529,7 +3701,7 @@ local function ApplyPreset(
 end
 
 --============================================================
--- PRESET BUTTONS (код остаётся без изменений, генерируется автоматически)
+-- PRESET BUTTONS
 --============================================================
 
 for index, presetName in ipairs(
@@ -4484,7 +4656,7 @@ SettingsScroll.CanvasSize =
     )
 
 --============================================================
--- TOGGLE CREATOR (existing)
+-- TOGGLE CREATOR
 --============================================================
 
 local ToggleUI = {}
@@ -4503,7 +4675,7 @@ local function CreateToggle(
         + 8
         + (
             index - 1
-        ) * 53
+        ) * 65
 
     local row =
         Instance.new("TextButton")
@@ -4827,297 +4999,288 @@ CreateToggle(
 )
 
 --============================================================
--- UI TOGGLES & SLIDERS FOR FOV AND ASPECT RATIO
+-- PERFORMANCE / FOV / ASPECT SETTINGS
 --============================================================
 
-local newToggleIndex = 3
-local function CreateUIToggle(name, getter, setter)
-    CreateToggle(SettingsScroll, name, newToggleIndex, getter, setter)
-    newToggleIndex = newToggleIndex + 1
+-- All extra controls use one 65px vertical grid.
+local nextControlIndex = 1
+
+local function CreateControlToggle(name, getter, setter)
+    CreateToggle(
+        SettingsScroll,
+        name,
+        nextControlIndex,
+        getter,
+        setter
+    )
+
+    nextControlIndex = nextControlIndex + 1
 end
 
--- FOV Enable
-CreateUIToggle(
-    "Enable FOV Changer",
-    function() return UISettings.FOVEnabled end,
+local function CreateControlSlider(definition, onChanged)
+    local controlIndex = nextControlIndex
+
+    local row = Instance.new("Frame")
+    row.Name = definition.Key
+    row.Position = UDim2.fromOffset(
+        8,
+        #SettingDefinitions * 65
+            + 8
+            + (controlIndex - 1) * 65
+    )
+    row.Size = UDim2.new(1, -16, 0, 58)
+    row.BackgroundColor3 = Color3.fromRGB(39, 18, 56)
+    row.BackgroundTransparency = 0.18
+    row.BorderSizePixel = 0
+    row.ZIndex = 23
+    row.Parent = SettingsScroll
+
+    AddCorner(row, 13)
+    AddStroke(row, CONFIG.PurpleLight, 0.91, 1)
+
+    local label = Instance.new("TextLabel")
+    label.Position = UDim2.fromOffset(13, 7)
+    label.Size = UDim2.new(1, -100, 0, 18)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamMedium
+    label.Text = definition.Name
+    label.TextSize = 10
+    label.TextColor3 = CONFIG.Text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 24
+    label.Parent = row
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.AnchorPoint = Vector2.new(1, 0)
+    valueLabel.Position = UDim2.new(1, -13, 0, 7)
+    valueLabel.Size = UDim2.fromOffset(70, 18)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Font = Enum.Font.GothamSemibold
+    valueLabel.TextSize = 9
+    valueLabel.TextColor3 = CONFIG.PurpleLight
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    valueLabel.ZIndex = 24
+    valueLabel.Parent = row
+
+    local track = Instance.new("Frame")
+    track.Position = UDim2.fromOffset(13, 37)
+    track.Size = UDim2.new(1, -26, 0, 6)
+    track.BackgroundColor3 = Color3.fromRGB(68, 38, 84)
+    track.BorderSizePixel = 0
+    track.ZIndex = 24
+    track.Parent = row
+    AddCorner(track, 10)
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.fromScale(0, 1)
+    fill.BackgroundColor3 = CONFIG.Purple
+    fill.BorderSizePixel = 0
+    fill.ZIndex = 25
+    fill.Parent = track
+    AddCorner(fill, 10)
+
+    local knob = Instance.new("Frame")
+    knob.AnchorPoint = Vector2.new(0.5, 0.5)
+    knob.Position = UDim2.fromScale(0, 0.5)
+    knob.Size = UDim2.fromOffset(12, 12)
+    knob.BackgroundColor3 = CONFIG.White
+    knob.BorderSizePixel = 0
+    knob.ZIndex = 26
+    knob.Parent = track
+    AddCorner(knob, 99)
+
+    local dragging = false
+
+    local function SetValue(value, instant)
+        local normalized = Clamp(
+            (value - definition.Min) / (definition.Max - definition.Min),
+            0,
+            1
+        )
+
+        valueLabel.Text = string.format(
+            definition.Format or "%.2f",
+            value
+        )
+
+        if instant then
+            fill.Size = UDim2.fromScale(normalized, 1)
+            knob.Position = UDim2.fromScale(normalized, 0.5)
+        else
+            Tween(
+                fill,
+                {Size = UDim2.fromScale(normalized, 1)},
+                0.08,
+                Enum.EasingStyle.Sine
+            )
+
+            Tween(
+                knob,
+                {Position = UDim2.fromScale(normalized, 0.5)},
+                0.08,
+                Enum.EasingStyle.Sine
+            )
+        end
+    end
+
+    local function UpdateFromMouse(mouseX)
+        local trackWidth = math.max(track.AbsoluteSize.X, 1)
+        local normalized = Clamp(
+            (mouseX - track.AbsolutePosition.X) / trackWidth,
+            0,
+            1
+        )
+
+        local rawValue =
+            definition.Min
+            + (definition.Max - definition.Min) * normalized
+
+        local value =
+            math.round(rawValue / definition.Step)
+            * definition.Step
+
+        value = Clamp(
+            value,
+            definition.Min,
+            definition.Max
+        )
+
+        UISettings[definition.Key] = value
+        SetValue(value, false)
+
+        if onChanged then
+            onChanged(value)
+        end
+    end
+
+    Connect(
+        track.InputBegan,
+        function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                UpdateFromMouse(input.Position.X)
+            end
+        end
+    )
+
+    Connect(
+        UserInputService.InputChanged,
+        function(input)
+            if not dragging then
+                return
+            end
+
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                UpdateFromMouse(input.Position.X)
+            end
+        end
+    )
+
+    Connect(
+        UserInputService.InputEnded,
+        function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end
+    )
+
+    SliderUI[definition.Key] = {
+        SetValue = SetValue
+    }
+
+    SetValue(definition.Default, true)
+    nextControlIndex = nextControlIndex + 1
+end
+
+-- Performance
+CreateControlToggle(
+    "FullBright",
+    function()
+        return PerformanceState.FullBright
+    end,
     function(value)
-        UISettings.FOVEnabled = value
-        if not value and Camera then
-            Camera.FieldOfView = 70
+        SetFullBright(value)
+    end
+)
+
+CreateControlToggle(
+    "No Lag",
+    function()
+        return PerformanceState.NoLag
+    end,
+    function(value)
+        PerformanceState.NoLag = value
+
+        if value then
+            ApplyNoLag()
+        else
+            RestoreNoLag()
         end
     end
 )
 
--- FOV Slider
-do
-    local definition = {
+-- FOV – теперь включает агрессивный цикл
+CreateControlToggle(
+    "Enable FOV Changer",
+    function()
+        return UISettings.FOVEnabled
+    end,
+    function(value)
+        UISettings.FOVEnabled = value
+        if value then
+            StartFOVLoop()
+            SetGameFOV(UISettings.FOVValue)
+        else
+            StopFOVLoop()
+            RestoreGameFOV()
+        end
+    end
+)
+
+CreateControlSlider(
+    {
         Name = "FOV",
         Key = "FOVValue",
         Min = 1,
         Max = 120,
         Step = 1,
-        Default = 70
-    }
-    local function CreateUISlider(parent, def, indexOffset)
-        local row = Instance.new("Frame")
-        row.Name = def.Key
-        row.Position = UDim2.fromOffset(8, (#SettingDefinitions * 65 + 8 + (newToggleIndex - 1) * 53 + 8) + (indexOffset - 1) * 65)
-        row.Size = UDim2.new(1, -16, 0, 58)
-        row.BackgroundColor3 = Color3.fromRGB(39,18,56)
-        row.BackgroundTransparency = 0.18
-        row.BorderSizePixel = 0
-        row.ZIndex = 23
-        row.Parent = parent
-        AddCorner(row, 13)
-        AddStroke(row, CONFIG.PurpleLight, 0.91, 1)
-
-        local label = Instance.new("TextLabel")
-        label.Position = UDim2.fromOffset(13, 7)
-        label.Size = UDim2.new(1, -100, 0, 18)
-        label.BackgroundTransparency = 1
-        label.Font = Enum.Font.GothamMedium
-        label.Text = def.Name
-        label.TextSize = 10
-        label.TextColor3 = CONFIG.Text
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.ZIndex = 24
-        label.Parent = row
-
-        local valueLabel = Instance.new("TextLabel")
-        valueLabel.AnchorPoint = Vector2.new(1,0)
-        valueLabel.Position = UDim2.new(1, -13, 0, 7)
-        valueLabel.Size = UDim2.fromOffset(70, 18)
-        valueLabel.BackgroundTransparency = 1
-        valueLabel.Font = Enum.Font.GothamSemibold
-        valueLabel.TextSize = 9
-        valueLabel.TextColor3 = CONFIG.PurpleLight
-        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-        valueLabel.ZIndex = 24
-        valueLabel.Parent = row
-
-        local track = Instance.new("Frame")
-        track.Position = UDim2.fromOffset(13, 37)
-        track.Size = UDim2.new(1, -26, 0, 6)
-        track.BackgroundColor3 = Color3.fromRGB(68,38,84)
-        track.BorderSizePixel = 0
-        track.ZIndex = 24
-        track.Parent = row
-        AddCorner(track, 10)
-
-        local fill = Instance.new("Frame")
-        fill.Size = UDim2.fromScale(0,1)
-        fill.BackgroundColor3 = CONFIG.Purple
-        fill.BorderSizePixel = 0
-        fill.ZIndex = 25
-        fill.Parent = track
-        AddCorner(fill, 10)
-
-        local knob = Instance.new("Frame")
-        knob.AnchorPoint = Vector2.new(0.5,0.5)
-        knob.Position = UDim2.fromScale(0,0.5)
-        knob.Size = UDim2.fromOffset(12,12)
-        knob.BackgroundColor3 = CONFIG.White
-        knob.BorderSizePixel = 0
-        knob.ZIndex = 26
-        knob.Parent = track
-        AddCorner(knob, 99)
-
-        local dragging = false
-
-        local function SetUIValue(value, instant)
-            local normalized = (value - def.Min) / (def.Max - def.Min)
-            normalized = Clamp(normalized, 0, 1)
-            valueLabel.Text = string.format("%.2f", value)
-            if instant then
-                fill.Size = UDim2.fromScale(normalized, 1)
-                knob.Position = UDim2.fromScale(normalized, 0.5)
-            else
-                Tween(fill, {Size = UDim2.fromScale(normalized, 1)}, 0.08, Enum.EasingStyle.Sine)
-                Tween(knob, {Position = UDim2.fromScale(normalized, 0.5)}, 0.08, Enum.EasingStyle.Sine)
-            end
+        Default = 80,
+        Format = "%.0f"
+    },
+    function(value)
+        UISettings.FOVValue = value
+        if UISettings.FOVEnabled then
+            SetGameFOV(value)
         end
-
-        local function UpdateFromMouse(mouseX)
-            local trackWidth = math.max(track.AbsoluteSize.X, 1)
-            local normalized = Clamp((mouseX - track.AbsolutePosition.X) / trackWidth, 0, 1)
-            local rawValue = def.Min + (def.Max - def.Min) * normalized
-            local value = math.round(rawValue / def.Step) * def.Step
-            value = Clamp(value, def.Min, def.Max)
-            UISettings[def.Key] = value
-            SetUIValue(value, false)
-            if UISettings.FOVEnabled and Camera then
-                Camera.FieldOfView = value
-            end
-        end
-
-        Connect(track.InputBegan, function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-                UpdateFromMouse(input.Position.X)
-            end
-        end)
-
-        Connect(UserInputService.InputChanged, function(input)
-            if not dragging then return end
-            if input.UserInputType == Enum.UserInputType.MouseMovement then
-                UpdateFromMouse(input.Position.X)
-            end
-        end)
-
-        Connect(UserInputService.InputEnded, function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        end)
-
-        if not SliderUI["FOVValue"] then
-            SliderUI["FOVValue"] = { SetValue = SetUIValue }
-        end
-        SetUIValue(def.Default, true)
     end
+)
 
-    CreateUISlider(SettingsScroll, definition, 1)
-end
-
--- Aspect Ratio Enable
-CreateUIToggle(
+-- Aspect Ratio
+CreateControlToggle(
     "Enable Aspect Ratio",
-    function() return UISettings.AspectEnabled end,
+    function()
+        return UISettings.AspectEnabled
+    end,
     function(value)
         UISettings.AspectEnabled = value
     end
 )
 
--- Aspect Ratio Slider
-do
-    local definition = {
+CreateControlSlider(
+    {
         Name = "Ratio Value",
         Key = "AspectValue",
         Min = 0.05,
         Max = 1.14,
         Step = 0.01,
-        Default = 0.6
+        Default = 0.6,
+        Format = "%.2f"
     }
-    local function CreateUISlider2(parent, def, indexOffset)
-        local row = Instance.new("Frame")
-        row.Name = def.Key
-        row.Position = UDim2.fromOffset(8, (#SettingDefinitions * 65 + 8 + (newToggleIndex - 1) * 53 + 8) + (indexOffset - 1) * 65)
-        row.Size = UDim2.new(1, -16, 0, 58)
-        row.BackgroundColor3 = Color3.fromRGB(39,18,56)
-        row.BackgroundTransparency = 0.18
-        row.BorderSizePixel = 0
-        row.ZIndex = 23
-        row.Parent = parent
-        AddCorner(row, 13)
-        AddStroke(row, CONFIG.PurpleLight, 0.91, 1)
-
-        local label = Instance.new("TextLabel")
-        label.Position = UDim2.fromOffset(13, 7)
-        label.Size = UDim2.new(1, -100, 0, 18)
-        label.BackgroundTransparency = 1
-        label.Font = Enum.Font.GothamMedium
-        label.Text = def.Name
-        label.TextSize = 10
-        label.TextColor3 = CONFIG.Text
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.ZIndex = 24
-        label.Parent = row
-
-        local valueLabel = Instance.new("TextLabel")
-        valueLabel.AnchorPoint = Vector2.new(1,0)
-        valueLabel.Position = UDim2.new(1, -13, 0, 7)
-        valueLabel.Size = UDim2.fromOffset(70, 18)
-        valueLabel.BackgroundTransparency = 1
-        valueLabel.Font = Enum.Font.GothamSemibold
-        valueLabel.TextSize = 9
-        valueLabel.TextColor3 = CONFIG.PurpleLight
-        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-        valueLabel.ZIndex = 24
-        valueLabel.Parent = row
-
-        local track = Instance.new("Frame")
-        track.Position = UDim2.fromOffset(13, 37)
-        track.Size = UDim2.new(1, -26, 0, 6)
-        track.BackgroundColor3 = Color3.fromRGB(68,38,84)
-        track.BorderSizePixel = 0
-        track.ZIndex = 24
-        track.Parent = row
-        AddCorner(track, 10)
-
-        local fill = Instance.new("Frame")
-        fill.Size = UDim2.fromScale(0,1)
-        fill.BackgroundColor3 = CONFIG.Purple
-        fill.BorderSizePixel = 0
-        fill.ZIndex = 25
-        fill.Parent = track
-        AddCorner(fill, 10)
-
-        local knob = Instance.new("Frame")
-        knob.AnchorPoint = Vector2.new(0.5,0.5)
-        knob.Position = UDim2.fromScale(0,0.5)
-        knob.Size = UDim2.fromOffset(12,12)
-        knob.BackgroundColor3 = CONFIG.White
-        knob.BorderSizePixel = 0
-        knob.ZIndex = 26
-        knob.Parent = track
-        AddCorner(knob, 99)
-
-        local dragging = false
-
-        local function SetUIValue(value, instant)
-            local normalized = (value - def.Min) / (def.Max - def.Min)
-            normalized = Clamp(normalized, 0, 1)
-            valueLabel.Text = string.format("%.2f", value)
-            if instant then
-                fill.Size = UDim2.fromScale(normalized, 1)
-                knob.Position = UDim2.fromScale(normalized, 0.5)
-            else
-                Tween(fill, {Size = UDim2.fromScale(normalized, 1)}, 0.08, Enum.EasingStyle.Sine)
-                Tween(knob, {Position = UDim2.fromScale(normalized, 0.5)}, 0.08, Enum.EasingStyle.Sine)
-            end
-        end
-
-        local function UpdateFromMouse(mouseX)
-            local trackWidth = math.max(track.AbsoluteSize.X, 1)
-            local normalized = Clamp((mouseX - track.AbsolutePosition.X) / trackWidth, 0, 1)
-            local rawValue = def.Min + (def.Max - def.Min) * normalized
-            local value = math.round(rawValue / def.Step) * def.Step
-            value = Clamp(value, def.Min, def.Max)
-            UISettings[def.Key] = value
-            SetUIValue(value, false)
-        end
-
-        Connect(track.InputBegan, function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-                UpdateFromMouse(input.Position.X)
-            end
-        end)
-
-        Connect(UserInputService.InputChanged, function(input)
-            if not dragging then return end
-            if input.UserInputType == Enum.UserInputType.MouseMovement then
-                UpdateFromMouse(input.Position.X)
-            end
-        end)
-
-        Connect(UserInputService.InputEnded, function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        end)
-
-        if not SliderUI["AspectValue"] then
-            SliderUI["AspectValue"] = { SetValue = SetUIValue }
-        end
-        SetUIValue(def.Default, true)
-    end
-
-    CreateUISlider2(SettingsScroll, definition, 2)
-end
+)
 
 -- Update canvas size
-local totalRows = #SettingDefinitions * 65 + 8 + (newToggleIndex - 1) * 53 + 8 + 2 * 65 + 20
+local totalRows = #SettingDefinitions * 65 + 8 + nextControlIndex * 65 + 20
 SettingsScroll.CanvasSize = UDim2.fromOffset(0, totalRows)
 
 -- Refresh function for UI toggles
@@ -6410,6 +6573,8 @@ local function Unload()
     Alive =
         false
 
+    StopFOVLoop()  -- обязательно остановить циклы FOV
+
     DisconnectAll()
 
     DestroyShaderEffects()
@@ -7033,6 +7198,11 @@ SwitchPage(
     "Home"
 )
 
+-- Запускаем FOV-цикл, если опция уже была включена (на случай сохранения настроек)
+if UISettings.FOVEnabled then
+    StartFOVLoop()
+end
+
 --============================================================
 -- OPEN ANIMATION
 --============================================================
@@ -7062,7 +7232,3 @@ Tween(
     Enum.EasingStyle.Quint,
     Enum.EasingDirection.Out
 )
-
---============================================================
--- READY
---============================================================
