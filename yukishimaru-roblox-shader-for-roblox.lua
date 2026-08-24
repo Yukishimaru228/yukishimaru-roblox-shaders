@@ -4716,8 +4716,7 @@ local function CreateToggle(
     row.Text =
         ""
 
-    row.ZIndex =
-        23
+    row.ZIndex = 100 -- FIX: высокий ZIndex, чтобы не перекрывался
 
     row.Parent =
         parent
@@ -4769,8 +4768,7 @@ local function CreateToggle(
     title.TextXAlignment =
         Enum.TextXAlignment.Left
 
-    title.ZIndex =
-        24
+    title.ZIndex = 101
 
     title.Parent =
         row
@@ -4808,8 +4806,7 @@ local function CreateToggle(
     switch.BorderSizePixel =
         0
 
-    switch.ZIndex =
-        24
+    switch.ZIndex = 102
 
     switch.Parent =
         row
@@ -4840,8 +4837,7 @@ local function CreateToggle(
     knob.BorderSizePixel =
         0
 
-    knob.ZIndex =
-        25
+    knob.ZIndex = 103
 
     knob.Parent =
         switch
@@ -5002,8 +4998,8 @@ CreateToggle(
 -- PERFORMANCE / FOV / ASPECT SETTINGS
 --============================================================
 
--- All extra controls use one 65px vertical grid.
-local nextControlIndex = 1
+-- Все дополнительные контролы начинаются с индекса 3, чтобы не перекрывать Motion Blur и Vignette
+local nextControlIndex = 3
 
 local function CreateControlToggle(name, getter, setter)
     CreateToggle(
@@ -5032,7 +5028,7 @@ local function CreateControlSlider(definition, onChanged)
     row.BackgroundColor3 = Color3.fromRGB(39, 18, 56)
     row.BackgroundTransparency = 0.18
     row.BorderSizePixel = 0
-    row.ZIndex = 23
+    row.ZIndex = 100 -- FIX: высокий ZIndex
     row.Parent = SettingsScroll
 
     AddCorner(row, 13)
@@ -5047,7 +5043,7 @@ local function CreateControlSlider(definition, onChanged)
     label.TextSize = 10
     label.TextColor3 = CONFIG.Text
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.ZIndex = 24
+    label.ZIndex = 101
     label.Parent = row
 
     local valueLabel = Instance.new("TextLabel")
@@ -5059,7 +5055,7 @@ local function CreateControlSlider(definition, onChanged)
     valueLabel.TextSize = 9
     valueLabel.TextColor3 = CONFIG.PurpleLight
     valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-    valueLabel.ZIndex = 24
+    valueLabel.ZIndex = 101
     valueLabel.Parent = row
 
     local track = Instance.new("Frame")
@@ -5067,7 +5063,7 @@ local function CreateControlSlider(definition, onChanged)
     track.Size = UDim2.new(1, -26, 0, 6)
     track.BackgroundColor3 = Color3.fromRGB(68, 38, 84)
     track.BorderSizePixel = 0
-    track.ZIndex = 24
+    track.ZIndex = 102
     track.Parent = row
     AddCorner(track, 10)
 
@@ -5075,7 +5071,7 @@ local function CreateControlSlider(definition, onChanged)
     fill.Size = UDim2.fromScale(0, 1)
     fill.BackgroundColor3 = CONFIG.Purple
     fill.BorderSizePixel = 0
-    fill.ZIndex = 25
+    fill.ZIndex = 103
     fill.Parent = track
     AddCorner(fill, 10)
 
@@ -5085,7 +5081,7 @@ local function CreateControlSlider(definition, onChanged)
     knob.Size = UDim2.fromOffset(12, 12)
     knob.BackgroundColor3 = CONFIG.White
     knob.BorderSizePixel = 0
-    knob.ZIndex = 26
+    knob.ZIndex = 104
     knob.Parent = track
     AddCorner(knob, 99)
 
@@ -5279,8 +5275,8 @@ CreateControlSlider(
     }
 )
 
--- Update canvas size
-local totalRows = #SettingDefinitions * 65 + 8 + nextControlIndex * 65 + 20
+-- Update canvas size (увеличиваем запас)
+local totalRows = #SettingDefinitions * 65 + 8 + nextControlIndex * 65 + 80 -- FIX: добавили запас
 SettingsScroll.CanvasSize = UDim2.fromOffset(0, totalRows)
 
 -- Refresh function for UI toggles
@@ -7232,3 +7228,4 @@ Tween(
     Enum.EasingStyle.Quint,
     Enum.EasingDirection.Out
 )
+
