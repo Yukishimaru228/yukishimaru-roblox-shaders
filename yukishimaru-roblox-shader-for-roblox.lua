@@ -3352,21 +3352,21 @@ local Presets = {
     -- Насыщенность на максимум, яркость 0.05
     CreateEffect("ColorCorrection", {
         Saturation = 1,
-        Brightness = 0,
+        Brightness = 0.05,
         Contrast = -0.10
     })
 
     -- Лёгкая атмосфера
     CreateEffect("Atmosphere", {
         Density = 0.01,
-        Color = Color3.fromRGB(200, 200, 200)
+        Color = Color3.fromRGB(0, 0, 0)
     })
 
     -- Блум на самый минимум (едва заметный)
     CreateEffect("Bloom", {
         Intensity = 0,
         Size = 0,
-        Threshold = 1
+        Threshold = 0
     })
 
     -- FOV = 120
